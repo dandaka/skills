@@ -1,0 +1,7 @@
+{
+  "name": "web-scraper",
+  "description": "Fetch and extract content from web pages using Playwright/Chromium for JavaScript-rendered content",
+  "version": "1.0.0",
+  "author": "User",
+  "userInvocable": true
+}
