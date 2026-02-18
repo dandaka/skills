@@ -28,10 +28,20 @@ When the user runs `/job-search`:
 Read `work/search/job-sites.md` to get the list of job source URLs.
 
 ### 2. Load existing jobs from sheet
+
+**IMPORTANT:** Always load `$JOB_SHEET_ID` from env first:
+```bash
+source ~/.claude/.env
+```
+
+Then read the sheet:
 ```bash
 sheets-cli read table --spreadsheet $JOB_SHEET_ID --sheet "Jobs" --limit 500
 ```
-Extract all existing URLs and find the max ID for numbering new entries.
+
+**Parsing notes:**
+- The output may contain control characters that cause strict JSON parsers to fail. Always parse with `strict=False` in Python, e.g.: `json.loads(content, strict=False)`
+- Extract all existing URLs and find the max `#` value for numbering new entries.
 
 ### 3. Scrape each source
 For each URL in the sources file, use `agent-browser` to load and extract job listings:
@@ -69,7 +79,20 @@ sheets-cli append --spreadsheet $JOB_SHEET_ID --sheet "Jobs" \
   --values '{"#":"<next_id>","Link":"<job_url>","Status":"2do","Company":"<company>","Position":"<position>","Compensation":"<comp_or_empty>","Referral":"","Source":"<source_name>"}'
 ```
 
-Auto-increment the ID from the max existing ID.
+Auto-increment the ID from the max existing `#` value.
+
+### Updating a row status
+To update a field (e.g. status) by row ID, use:
+```bash
+sheets-cli update key \
+  --spreadsheet $JOB_SHEET_ID \
+  --sheet "Jobs" \
+  --key-col "#" \
+  --key "<row_id>" \
+  --set '{"Status":"Not fit"}'
+```
+
+**Do NOT use** `sheets-cli update --where` or `sheets-cli update --spreadsheet` — those don't exist. The correct subcommand is `update key` or `update row`.
 
 ### 6. Report
 Summarize to the user:
@@ -110,9 +133,75 @@ Summarize to the user:
 ### JobStash
 - Loads content dynamically — must use `agent-browser` (not simple HTTP fetch)
 - The unique slug is the alphanumeric ID in the URL path (e.g., `5HtvTo` from `.../nethermind-product-manager-...-5HtvTo/details`)
+- The "Apply Directly" button may open a new tab or require login. To get the real application URL without clicking, extract it from the page source:
+  ```bash
+  curl -s "https://jobstash.xyz/jobs/<slug>/details" | grep -o '"url":"[^"]*"' | grep -v "jobstash\|twitter\|telegram\|warpcast\|linkedin" | head -3
+  ```
+
+## Applying to jobs (opportunity flow)
+
+When applying to a batch of `2do` jobs:
+
+1. **Check if job is still open first** before doing any CV/form work. For JobStash URLs, use curl to check for `"title":` in the response:
+   ```bash
+   curl -s "<url>" | grep -o '"title":"[^"]*"' | head -1
+   ```
+   If `Job Not Found` is returned, mark as `Not fit` immediately and skip.
+
+2. **Before filling the form, capture all fields to a markdown file.** Scroll through the entire form first, then create `leads/<id>-<slug>/answers.md` with this structure:
+
+   ```markdown
+   # Application Form: <Company> - <Position>
+
+   | Field | Type | Proposed Answer |
+   |-------|------|-----------------|
+   | Full Name | text (short) | Vlad Ra |
+   | Email | email (short) | vlad@example.com |
+   | Cover Letter | textarea | <one paragraph> |
+   | LinkedIn URL | url (short) | https://linkedin.com/in/vladra |
+   | Why do you want to work here? | textarea | <2-3 sentences> |
+   ```
+
+   **Field type values:** `text (short)`, `email (short)`, `url (short)`, `select`, `textarea`, `checkbox`, `file`
+
+   **Answer length rules:**
+   - `short` fields (text, email, url, select): one sentence maximum, no padding
+   - `textarea` fields: concise paragraph, focus on relevance to role
+   - `file` fields: note the file path (e.g., `leads/<id>/cv.pdf`)
+
+   Show the user the `answers.md` and wait for confirmation before proceeding to fill and submit.
+
+3. For file upload (resume), use `agent-browser upload` targeting the hidden `input[type="file"]` by CSS selector or ID - NOT the visible button:
+   ```bash
+   # Find the input ID first via snapshot or JS:
+   # agent-browser snapshot | grep -i "file\|resume"
+   # Then upload using the CSS ID:
+   agent-browser upload "#_systemfield_resume" /path/to/cv.pdf
+   # For Ashby forms specifically, the resume input ID is #_systemfield_resume
+   ```
+   Do NOT use `agent-browser upload @ref` on a `<button>` element - it must be the actual `<input type="file">`.
+
+4. **After uploading the file, wait 20-30 seconds before submitting.** Ashby does a background sync after upload. If you submit too early, it shows: *"We're updating your application (e.g. uploading files), please try again when they're finished."* Clicking submit again while this warning is visible adds more warnings and keeps the form stuck. Wait until the warning disappears before submitting.
+   ```bash
+   agent-browser upload "#_systemfield_resume" /path/to/cv.pdf
+   sleep 25  # wait for Ashby background sync
+   # verify warning is gone before clicking submit:
+   agent-browser snapshot 2>&1 | grep -E "updating|uploading"
+   # only proceed if no warnings shown
+   agent-browser click @<submit_ref>
+   ```
+
+5. **agent-browser refs reset after every dropdown interaction.** After clicking a combobox option, always run `agent-browser snapshot` again to get fresh refs before filling the next field. The `@eN` ref numbers shift when the DOM updates.
+
+6. After user submits, update status to `Applied`:
+   ```bash
+   sheets-cli update key --spreadsheet $JOB_SHEET_ID --sheet "Jobs" --key-col "#" --key "<id>" --set '{"Status":"Applied"}'
+   ```
 
 ## Tips
 
+- Always `source ~/.claude/.env` before using `$JOB_SHEET_ID`
 - Always close the browser session when done: `agent-browser close`
 - Run appends in parallel (up to 6) for speed
 - The `snapshot` command returns an accessibility tree — parse job titles, companies, and URLs from heading elements and link URLs
+- Parse sheet JSON output with `strict=False` to handle control characters in cell values
