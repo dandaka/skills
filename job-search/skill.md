@@ -148,7 +148,24 @@ When applying to a batch of `2do` jobs:
    ```
    If `Job Not Found` is returned, mark as `Not fit` immediately and skip.
 
-2. **Before filling the form, capture all fields to a markdown file.** Scroll through the entire form first, then create `leads/<id>-<slug>/answers.md` with this structure:
+2. **Always open forms with remote debugging enabled** so the human can connect via `chrome://inspect` and review before submitting.
+
+   `agent-browser --cdp 9222` does NOT expose a port — it means "connect agent-browser TO an existing Chrome on 9222". That is the wrong direction.
+
+   The correct approach: set env vars so agent-browser's internal Chromium exposes a debug port:
+   ```bash
+   agent-browser close  # kill any existing daemon first
+   export AGENT_BROWSER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+   export AGENT_BROWSER_ARGS="--remote-debugging-port=9222"
+   agent-browser open "<application_url>"
+   ```
+   Then verify the port is up: `curl -s http://localhost:9222/json/version`
+
+   The user can now go to `chrome://inspect` → Configure → `localhost:9222` to see the page.
+
+   All subsequent `agent-browser` commands in the session work normally (no `--cdp` flag needed — the daemon is already running).
+
+3. **Before filling the form, capture all fields to a markdown file.** Scroll through the entire form first, then create `leads/<id>-<slug>/answers.md` with this structure:
 
    ```markdown
    # Application Form: <Company> - <Position>
@@ -169,34 +186,47 @@ When applying to a batch of `2do` jobs:
    - `textarea` fields: concise paragraph, focus on relevance to role
    - `file` fields: note the file path (e.g., `leads/<id>/cv.pdf`)
 
-   Show the user the `answers.md` and wait for confirmation before proceeding to fill and submit.
+   Show the user the `answers.md` and **wait for their confirmation** before filling any fields.
 
-3. For file upload (resume), use `agent-browser upload` targeting the hidden `input[type="file"]` by CSS selector or ID - NOT the visible button:
+4. For file upload (resume), use `agent-browser upload` targeting the hidden `input[type="file"]` by CSS selector or ID - NOT the visible button:
    ```bash
-   # Find the input ID first via snapshot or JS:
-   # agent-browser snapshot | grep -i "file\|resume"
+   # Find the input ID first via JS:
+   agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(el => ({id: el.id, accept: el.accept}))"
    # Then upload using the CSS ID:
-   agent-browser upload "#_systemfield_resume" /path/to/cv.pdf
-   # For Ashby forms specifically, the resume input ID is #_systemfield_resume
+   agent-browser upload "#_systemfield_resume" /path/to/cv.pdf   # Ashby
+   agent-browser upload "#candidate_resume_remote_url" /path/to/cv.pdf  # Teamtailor
    ```
    Do NOT use `agent-browser upload @ref` on a `<button>` element - it must be the actual `<input type="file">`.
 
-4. **After uploading the file, wait 20-30 seconds before submitting.** Ashby does a background sync after upload. If you submit too early, it shows: *"We're updating your application (e.g. uploading files), please try again when they're finished."* Clicking submit again while this warning is visible adds more warnings and keeps the form stuck. Wait until the warning disappears before submitting.
+5. **After uploading the file, wait 20-30 seconds.** Ashby does a background sync after upload. If you submit too early, it shows: *"We're updating your application (e.g. uploading files), please try again when they're finished."* Wait until the warning disappears.
    ```bash
    agent-browser upload "#_systemfield_resume" /path/to/cv.pdf
-   sleep 25  # wait for Ashby background sync
-   # verify warning is gone before clicking submit:
+   sleep 25
    agent-browser snapshot 2>&1 | grep -E "updating|uploading"
-   # only proceed if no warnings shown
-   agent-browser click @<submit_ref>
    ```
 
-5. **agent-browser refs reset after every dropdown interaction.** After clicking a combobox option, always run `agent-browser snapshot` again to get fresh refs before filling the next field. The `@eN` ref numbers shift when the DOM updates.
+6. **agent-browser refs reset after every dropdown interaction.** After clicking a combobox option, always run `agent-browser snapshot` again to get fresh refs before filling the next field.
 
-6. After user submits, update status to `Applied`:
+7. **Hand off to the user for final review and submission.** Once all fields are filled and the file is uploaded, do NOT click Submit. Tell the user:
+   > "Form is filled and ready. To connect and review:
+   > 1. Open Chrome and go to `chrome://inspect`
+   > 2. Under **Remote Target**, click **inspect** on the page that appears
+   > 3. Review all fields, then click Submit yourself."
+
+   Leave the browser session open and wait. **Do NOT close it.** After the user confirms they submitted, update status to `Applied`:
    ```bash
    sheets-cli update key --spreadsheet $JOB_SHEET_ID --sheet "Jobs" --key-col "#" --key "<id>" --set '{"Status":"Applied"}'
    ```
+
+## Regenerating all CVs
+
+To rebuild every `cv.pdf` from its `cv.md` in one shot:
+
+```bash
+bash work/search/regen-pdfs.sh
+```
+
+The script iterates over every `leads/*/` directory that contains a `cv.md` and runs `md-to-pdf cv.md` inside it.
 
 ## Tips
 

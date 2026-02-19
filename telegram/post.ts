@@ -1,5 +1,23 @@
 #!/usr/bin/env bun
 import { Bot } from "grammy";
+import { existsSync } from "fs";
+import path from "path";
+import os from "os";
+
+// Load ~/.claude/.env if present (bun only auto-loads .env from cwd)
+const claudeEnvPath = path.join(os.homedir(), ".claude", ".env");
+if (existsSync(claudeEnvPath)) {
+  const file = await Bun.file(claudeEnvPath).text();
+  for (const line of file.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
 
 // Determine if we're using default channel from .env or explicit channel
 const hasDefaultChannel = !!process.env.TELEGRAM_CHANNEL_ID;
