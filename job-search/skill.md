@@ -218,7 +218,46 @@ When applying to a batch of `2do` jobs:
    sheets-cli update key --spreadsheet $JOB_SHEET_ID --sheet "Jobs" --key-col "#" --key "<id>" --set '{"Status":"Applied"}'
    ```
 
+## Local sync (jobs-local.json)
+
+The sheet is the source of truth. Use the sync script to clone it locally for fast offline access.
+
+```bash
+# Sync all jobs (default output: work/search/jobs-local.json)
+bun ~/.claude/skills/job-search/sync.ts
+
+# Sync only "2do" jobs
+bun ~/.claude/skills/job-search/sync.ts --status 2do
+
+# Custom output path
+bun ~/.claude/skills/job-search/sync.ts --out /tmp/jobs.json
+```
+
+The output JSON format:
+```json
+{
+  "meta": { "syncedAt": "...", "total": 500, "count": 42, "statusFilter": "2do" },
+  "jobs": [
+    { "#": "1", "Link": "...", "Status": "2do", "Company": "...", "Position": "...", ... }
+  ]
+}
+```
+
+**When to re-sync:** before any batch processing session. The local file is a point-in-time snapshot — always re-sync to get fresh data. The file is tracked in git (snapshot history).
+
+**Reading locally synced jobs in code:**
+```ts
+const { jobs } = JSON.parse(await Bun.file("work/search/jobs-local.json").text());
+```
+
+**Legacy one-liner** (still works, but prefer the script above):
+```bash
+source ~/.claude/.env && sheets-cli read table --spreadsheet $JOB_SHEET_ID --sheet "Jobs" --limit 500 > /tmp/jobs-full.json && jq '.result.rows | map(select(.Status == "2do"))' /tmp/jobs-full.json > work/search/todo-jobs.json
+```
+
 ## Regenerating all CVs
+
+**IMPORTANT: Always regenerate PDFs in a single batch command - never one-by-one per folder.**
 
 To rebuild every `cv.pdf` from its `cv.md` in one shot:
 
@@ -227,6 +266,16 @@ bash work/search/regen-pdfs.sh
 ```
 
 The script iterates over every `leads/*/` directory that contains a `cv.md` and runs `md-to-pdf cv.md` inside it.
+
+To only regenerate PDFs that are missing (new cv.md files without a cv.pdf):
+
+```bash
+for dir in work/search/leads/*/; do
+  [ -f "$dir/cv.md" ] && [ ! -f "$dir/cv.pdf" ] && (cd "$dir" && md-to-pdf cv.md)
+done
+```
+
+Do NOT call `md-to-pdf cv.md` individually for each folder as agents complete - always use batch commands above.
 
 ## Tips
 
