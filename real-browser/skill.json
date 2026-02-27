@@ -1,0 +1,6 @@
+{
+  "name": "real-browser",
+  "description": "Launch and control real Chrome Beta with persistent login sessions. Use when automating websites that detect Playwright (LinkedIn, etc.) or when running parallel browser sessions for job applications.",
+  "version": "1.0.0",
+  "userInvocable": true
+}

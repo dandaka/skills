@@ -55,8 +55,11 @@ gog gmail search --account $GOOGLE_ACCOUNT "in:inbox"
 To read a specific email:
 
 ```bash
-# Read email by ID
-gog gmail get --account $GOOGLE_ACCOUNT <message-id>
+# Read thread by ID (preferred - shows full content)
+gog gmail thread get --account="$GOOGLE_ACCOUNT" <threadId>
+
+# Search messages (returns message IDs)
+gog gmail messages search --account="$GOOGLE_ACCOUNT" "from:sender@example.com"
 ```
 
 ### 3. Send Email
@@ -66,6 +69,12 @@ To send a new email:
 ```bash
 # Send email
 gog gmail send --account $GOOGLE_ACCOUNT --to "recipient@example.com" --subject "Subject" --body "Message body"
+
+# Send with attachment (--attach flag, repeatable for multiple files)
+gog gmail send --account $GOOGLE_ACCOUNT --to "recipient@example.com" --subject "Subject" --body "Message body" --attach "/path/to/file.pdf"
+
+# Send with multiple attachments
+gog gmail send --account $GOOGLE_ACCOUNT --to "recipient@example.com" --subject "Subject" --body "Message body" --attach "/path/to/cv.pdf" --attach "/path/to/cover.pdf"
 
 # Send with CC/BCC
 gog gmail send --account $GOOGLE_ACCOUNT --to "recipient@example.com" --cc "cc@example.com" --bcc "bcc@example.com" --subject "Subject" --body "Message"
@@ -94,16 +103,18 @@ gog gmail labels get --account $GOOGLE_ACCOUNT <labelIdOrName>
 gog gmail labels create --account $GOOGLE_ACCOUNT <name>
 
 # Add/remove labels from threads (can operate on multiple threads at once)
-gog gmail labels modify --account $GOOGLE_ACCOUNT <threadId> ... --add=<label1>,<label2> --remove=<label3>
+gog gmail labels modify --account="$GOOGLE_ACCOUNT" --add=<label1>,<label2> --remove=<label3> <threadId> ...
 
 # Mark emails as read (remove UNREAD label)
-gog gmail labels modify --account $GOOGLE_ACCOUNT <threadId> ... --remove=UNREAD
+gog gmail labels modify --account="$GOOGLE_ACCOUNT" --remove=UNREAD <threadId>
 
 # Mark emails as unread (add UNREAD label)
-gog gmail labels modify --account $GOOGLE_ACCOUNT <threadId> ... --add=UNREAD
+gog gmail labels modify --account="$GOOGLE_ACCOUNT" --add=UNREAD <threadId>
 ```
 
 **Note**: Use thread IDs (not message IDs) for label operations. Thread IDs are returned by `gog gmail search` commands.
+
+**IMPORTANT - `--account` flag quirk**: When `--account` is followed by another flag (not the thread ID), use `--account="$GOOGLE_ACCOUNT"` with `=` syntax, and put threadId(s) at the end. Otherwise the parser treats the next flag as the account value.
 
 ### 5. Trash/Delete Emails
 
@@ -165,6 +176,25 @@ If authentication fails:
 gog gmail init
 ```
 
+## Job Application Emails
+
+When applying to jobs via email (e.g. jobs@company.com):
+
+1. Read `answers.md` and `position.md` from the lead folder for context.
+2. Compose using the cover letter from `answers.md` as the email body.
+3. Attach `cv.pdf` using `--attach /path/to/cv.pdf`.
+4. **IMPORTANT: `gog gmail` has no draft mode - `send` sends immediately.** Always show the user the full email text and ask for confirmation before sending.
+5. After sending, update the sheet status to `Applied`.
+
+Example:
+```bash
+gog gmail send --account $GOOGLE_ACCOUNT \
+  --to "jobs@company.com" \
+  --subject "Product Manager - Your Name" \
+  --body "..." \
+  --attach "/path/to/leads/024-company/cv.pdf"
+```
+
 ## Tips
 
 - Use natural language queries for searching emails
@@ -173,3 +203,4 @@ gog gmail init
 - The tool supports Gmail's search operators (from:, to:, subject:, etc.)
 - **Always use `--reply-to-message-id` or `--thread-id` when replying to emails** to keep conversations properly threaded in Gmail
 - Use `--reply-all` to automatically include all original recipients (To, CC) in your reply
+- **Attachments**: use `--attach /absolute/path/to/file` flag (repeatable for multiple files)
