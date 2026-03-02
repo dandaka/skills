@@ -30,8 +30,8 @@ A Claude Code skill for collecting articles into a reading buffer and sending th
 1. Read `reading/index.md`, collect all rows where Sent = `-`
 2. Load their corresponding `.md` files
 3. Build combined Markdown:
-   - **Section 1 — Navigation**: Table of contents with title + 1-sentence summary per article
-   - **Section 2+**: Full article content, one H1 section per article
+   - **Full article content only**: one H1 section per article, full body, separated by `---`
+   - No summaries, no navigation section
 4. Convert to PDF using `md-to-pdf` (npm package)
    - Optimized for Kindle A6 (108mm × 144mm), medium font, comfortable margins
    - Style hardcoded in skill file, tunable by editing

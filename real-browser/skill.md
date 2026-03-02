@@ -13,8 +13,8 @@ Doing so sends automation signals (Playwright-controlled browser) that websites 
 
 **CORRECT workflow:**
 1. Launch Chrome Beta with `--remote-debugging-port=9222` and `--user-data-dir`
-2. Connect agent-browser with `agent-browser connect 9222`
-3. Use agent-browser commands normally (no `--cdp` flag needed after connect)
+2. Connect a named session: `agent-browser --session <name> connect 9222`
+3. Use `--session <name>` on ALL subsequent commands
 
 ## Launch Chrome Beta
 
@@ -39,17 +39,19 @@ curl -s http://localhost:9222/json/version
 
 ## Connect agent-browser
 
-```bash
-agent-browser connect 9222
-```
-
-After connecting, all commands work without any extra flags:
+**CRITICAL: Always use `--session <name>` on EVERY command.** Without `--session`, each invocation is a standalone process that doesn't persist the CDP connection — commands will hang or launch a separate headless browser.
 
 ```bash
-agent-browser open "https://www.linkedin.com"
-agent-browser snapshot -i
-agent-browser click @e1
+agent-browser --session main connect 9222
 ```
+
+After connecting, all commands work with the same session flag:
+
+```bash
+agent-browser --session main snapshot -i
+agent-browser --session main click @e1
+```
+
 
 ## Persistent login sessions
 
@@ -72,13 +74,13 @@ Multiple independent sessions share one Chrome instance and its login state. Eac
 
 ```bash
 agent-browser --session s1 connect 9222
-agent-browser --session s1 tab new "https://site1.com/apply"
+agent-browser --session s1 eval "window.location.href='https://site1.com/apply'"
 
 agent-browser --session s2 connect 9222
-agent-browser --session s2 tab new "https://site2.com/apply"
+agent-browser --session s2 eval "window.location.href='https://site2.com/apply'"
 
 agent-browser --session s3 connect 9222
-agent-browser --session s3 tab new "https://site3.com/apply"
+agent-browser --session s3 eval "window.location.href='https://site3.com/apply'"
 ```
 
 **Each session operates independently:**
@@ -138,3 +140,4 @@ agent-browser eval 'navigator.webdriver'
 - Profile at `~/.chrome-beta-profile` is separate from your main Chrome Beta profile
 - Chrome must be relaunched with the debug port each time (doesn't persist between reboots)
 - No need for multiple Chrome instances on different ports - use `--session` instead
+- **NEVER use bare `agent-browser` without `--session`** — the CDP connection won't persist and commands will hang or spawn a headless browser

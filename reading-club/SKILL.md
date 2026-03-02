@@ -61,34 +61,10 @@ When args = "send":
 
 1. Read `reading/index.md`, find all rows where Sent column = `-`
 2. Load their `.md` files from `reading/`
-3. For each unsent article, generate a 1-sentence summary (15–25 words)
-4. Build combined markdown `reading/_digest-tmp.md`:
+3. Build combined markdown `reading/_digest-tmp.md`:
    - Header: `# Reading Digest — YYYY-MM-DD`
-   - **Intro paragraph**: 3–5 sentences synthesising all articles — common themes, overall conclusion, what they mean together
-   - **Numbered article list**: for each article:
-     - `**N. [Article Title](url)**` (bold, linked)
-     - blank line
-     - 2–4 sentence summary of that article
-   - `---` separator
-   - **Article sections**: one per article, H1 title, full body, separated by `---`
-
-### Navigation section example format
-
-```markdown
-# Reading Digest — 2026-02-20
-
-This digest explores [themes...]. [Overall conclusion sentence.]
-
-**1. [Article Title](https://url)**
-
-Summary of this article in 2–4 sentences.
-
-**2. [Another Article](https://url)**
-
-Summary of this article in 2–4 sentences.
-
----
-```
+   - **Article sections**: one per article, full body, separated by `---`
+   - Each article starts with its H1 title and source URL
 5. Run `md-to-pdf` with Kindle A6 CSS (see style spec below)
 6. Save output as `reading/digest-YYYY-MM-DD.pdf`
 7. Send via `gog gmail send` (Bash): attach PDF, recipient = `$KINDLE_EMAIL` from `~/.claude/.env`, subject `Reading Digest YYYY-MM-DD`

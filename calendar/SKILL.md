@@ -246,6 +246,13 @@ gog auth add
 gog auth manage
 ```
 
+## User Preferences
+
+- **Two events for activities with logistics** - When booking an activity that has a start time + logistics buffer, create 2 separate events:
+  1. Main event at the exact start time (e.g. "Padel — LRC, 16:00–18:00")
+  2. "Logistics" event 30 min before (e.g. "Padel logistics, 15:30–16:00")
+  This way the exact start time is visible at a glance on the calendar.
+
 ## Tips
 
 - **ALWAYS specify --account** - Include `--account "$GOOGLE_ACCOUNT"` in all commands to avoid authentication errors
