@@ -4,6 +4,8 @@ description: Toggle peon-ping sound notifications on/off. Use when user wants to
 user_invocable: true
 ---
 
+[![skillcheck passed](https://img.shields.io/badge/skillcheck-passed-4c1)](https://getskillcheck.com) ![score](https://img.shields.io/badge/score-94-brightgreen)
+
 # peon-ping-toggle
 
 Toggle peon-ping sounds on or off.
