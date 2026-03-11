@@ -87,10 +87,10 @@ agent-browser --session s3 eval "window.location.href='https://site3.com/apply'"
 
 ```bash
 agent-browser --session s1 snapshot -i
-agent-browser --session s1 fill @e1 "Vlad Ra"
+agent-browser --session s1 fill @e1 "Jane Doe"
 
 agent-browser --session s2 snapshot -i
-agent-browser --session s2 fill @e3 "vlad19@gmail.com"
+agent-browser --session s2 fill @e3 "user@example.com"
 ```
 
 **Tested:** 5+ parallel sessions work, all sharing the same cookies/login state.
@@ -112,7 +112,7 @@ Use lead ID as session name:
 agent-browser --session job-124 connect 9222
 agent-browser --session job-124 tab new "https://company.com/apply"
 agent-browser --session job-124 snapshot
-agent-browser --session job-124 fill @ref_1 "Vlad Ra"
+agent-browser --session job-124 fill @ref_1 "Jane Doe"
 agent-browser --session job-124 tab close  # cleanup after done
 ```
 

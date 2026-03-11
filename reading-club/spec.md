@@ -36,7 +36,7 @@ A Claude Code skill for collecting articles into a reading buffer and sending th
    - Optimized for Kindle A6 (108mm × 144mm), medium font, comfortable margins
    - Style hardcoded in skill file, tunable by editing
 5. Save PDF as `reading/digest-YYYY-MM-DD.pdf`
-6. Send PDF to `vlad19_tO3UAg@kindle.com` via `/mail` skill
+6. Send PDF to `$KINDLE_EMAIL` via `/mail` skill
 7. Update `reading/index.md` — mark sent articles with ✅ YYYY-MM-DD
 
 ---
