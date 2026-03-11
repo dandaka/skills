@@ -48,11 +48,11 @@ Location: `reading/index.md`
 ```markdown
 # Reading Club Index
 
-| # | Title | Added | Sent |
-|---|-------|-------|------|
-| 1 | [Article Title](https://url) | 2026-02-20 | - |
-| 2 | [Another Article](https://url) | 2026-02-19 | ✅ 2026-02-20 |
+1. [Article Title](https://url) — 2026-02-20
+2. [Another Article](https://url) — 2026-02-19 ✅ 2026-02-20
 ```
+
+Unsent: no ✅ suffix. Sent: append ✅ YYYY-MM-DD.
 
 ---
 

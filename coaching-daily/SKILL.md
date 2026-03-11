@@ -1,7 +1,7 @@
 ---
 name: coaching-daily
 description: Daily morning coaching check-in. Structured 5-question flow with pattern detection, financial runway countdown, and priority alignment check. Logs to knowledge base.
-compatibility: Requires knowledge base at ~/projects/knowledge-base
+compatibility: Requires knowledge base at ~/projects/dn-kb
 metadata:
   author: dandaka
   version: "1.0"
@@ -20,10 +20,10 @@ Provide structured external accountability for personal goals. Simulate the acco
 
 Read these files to understand current state:
 
-1. `~/projects/knowledge-base/coaching/priorities.md` — current top 3 priorities
-2. `~/projects/knowledge-base/profile/constraints.md` — financial constraint section for runway calc
-3. Latest daily log: `~/projects/knowledge-base/coaching/daily/` — find most recent file
-4. `~/projects/knowledge-base/profile/goals.md` — for alignment check
+1. `~/projects/dn-kb/coaching/priorities.md` — current top 3 priorities
+2. `~/projects/dn-kb/profile/constraints.md` — financial constraint section for runway calc
+3. Latest daily log: `~/projects/dn-kb/coaching/daily/` — find most recent file
+4. `~/projects/dn-kb/profile/goals.md` — for alignment check
 
 ### Step 2: Show Status Dashboard
 
@@ -79,7 +79,7 @@ Based on answers, provide a brief coaching response. Apply these rules:
 
 ### Step 5: Log
 
-Write the check-in to `~/projects/knowledge-base/coaching/daily/YYYY-MM-DD.md`:
+Write the check-in to `~/projects/dn-kb/coaching/daily/YYYY-MM-DD.md`:
 
 ```markdown
 # Daily Check-In: YYYY-MM-DD

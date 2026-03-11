@@ -3,8 +3,8 @@
  * Converts a Hyprnote session folder into a markdown transcript file.
  * Usage: bun convert.ts <session_folder> <output_path>
  *
- * Channel 0 = Other (remote participant)
- * Channel 1 = Me (local user)
+ * Channel 0 = Me (local user / microphone)
+ * Channel 1 = Other (remote participant / speaker)
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -67,7 +67,7 @@ function buildTurns(words: Word[]): Array<{ channel: number; text: string }> {
 }
 
 function speakerLabel(channel: number): string {
-  return channel === 1 ? "Me" : "Other";
+  return channel === 0 ? "Me" : "Other";
 }
 
 const [, , sessionFolder, outputPath] = process.argv;
@@ -86,10 +86,23 @@ const transcriptRaw = readFileSync(
 );
 const transcriptData: TranscriptJson = JSON.parse(transcriptRaw);
 
-// Merge all words from all transcripts, sorted by start_ms
-const allWords: Word[] = transcriptData.transcripts
-  .flatMap((t) => t.words)
-  .sort((a, b) => a.start_ms - b.start_ms);
+// Pick the best transcript when multiple exist.
+// Primary: longest transcript (most words). Tiebreak: best channel balance.
+// Short transcripts with good balance are often leaked fragments from adjacent sessions.
+function transcriptScore(t: Transcript): number {
+  const total = t.words.length;
+  if (total === 0) return 0;
+  const c0 = t.words.filter((w) => w.channel === 0).length;
+  const c1 = total - c0;
+  const balance = Math.min(c0, c1) / total; // 0..0.5
+  return total + balance; // length dominates, balance breaks ties
+}
+
+const bestTranscript = transcriptData.transcripts.reduce((best, t) =>
+  transcriptScore(t) > transcriptScore(best) ? t : best
+);
+
+const allWords: Word[] = bestTranscript.words.slice().sort((a, b) => a.start_ms - b.start_ms);
 
 if (allWords.length < 10) {
   console.error(`Skipping: transcript too short (${allWords.length} words)`);

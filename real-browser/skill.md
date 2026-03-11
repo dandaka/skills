@@ -134,6 +134,44 @@ agent-browser eval 'navigator.webdriver'
 # Expected: false (or undefined)
 ```
 
+## Reliability: timeouts and checkpoints
+
+The main failure mode in browser automation is an unbounded wait — a page that never loads, a element that never appears, a redirect loop. Don't iterate on browser config; instead, treat each browser subtask with a hard timeout and checkpoint strategy.
+
+**Hard timeouts on every command:**
+
+```bash
+timeout 15 agent-browser --session main snapshot -i
+timeout 10 agent-browser --session main click @e1
+timeout 20 agent-browser --session main fill @e3 "value"
+```
+
+If a command times out, take a snapshot to capture last-known state, then decide whether to retry or skip.
+
+**Checkpoint pattern for multi-step flows:**
+
+Break long flows (e.g. job applications) into discrete steps. After each step, snapshot and record progress so you can retry from that point rather than restarting from scratch.
+
+```
+Step 1: Navigate to form → checkpoint: on form page
+Step 2: Fill personal info → checkpoint: info filled
+Step 3: Upload CV        → checkpoint: CV attached
+Step 4: Submit           → checkpoint: done
+```
+
+If step 3 fails, retry from step 3 (the page is already on the form with info filled), not from step 1.
+
+**Recovery after timeout:**
+
+```bash
+# Take a snapshot to see where we are
+timeout 10 agent-browser --session main snapshot -i
+# If page is stuck, try navigating directly
+timeout 10 agent-browser --session main eval "window.location.href='https://...'"
+# If session is dead, reconnect
+agent-browser --session main connect 9222
+```
+
 ## Notes
 
 - If Chrome Beta is already running without `--remote-debugging-port`, kill it first

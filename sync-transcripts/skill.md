@@ -3,88 +3,62 @@ name: sync-transcripts
 description: Sync Hyprnote call transcripts to the knowledge base. Finds new sessions in ~/Library/Application Support/hyprnote/sessions/, converts them to markdown (transcript + summary), and saves to calls/ in the knowledge base. Use when user wants to sync, import, or review call transcripts.
 metadata:
   author: dandaka
-  version: "1.0"
-allowed-tools: Bash(bun*), Bash(ls*), Bash(mkdir*), Read, Write, Edit
+  version: "2.0"
+allowed-tools: Bash(bun*), Bash(ls*), Bash(mkdir*), Read, Write, Edit, Glob
 ---
 
 # Sync Transcripts Skill
 
-Reads Hyprnote session folders, converts JSON transcripts to markdown files, and stores them in the knowledge base under `calls/`.
+Syncs Hyprnote call recordings to the knowledge base as markdown files in `calls/`.
 
-## Source
+All scripts live in this skill folder (`~/.claude/skills/sync-transcripts/`):
+- **sync.ts** — discovers sessions, manages the index, orchestrates conversion
+- **convert.ts** — converts a single session folder to markdown
 
-**Sessions folder:** `~/Library/Application Support/hyprnote/sessions/`
-
-Each session folder contains:
-- `_meta.json` — title, created_at, participants
-- `transcript.json` — words array with channel (0 = remote/other, 1 = local/user) and text
-
-## Destination
-
-**Knowledge base folder:** `calls/` (create if missing)
-
-One markdown file per session, named: `YYYY-MM-DD-<slugified-title>.md`
+The index file (`calls/sessions-index.json`) maps Hyprnote session IDs to call filenames and tracks sync status.
 
 ## Workflow
 
 When the user runs `/sync-transcripts`:
 
-### 1. Discover sessions
+### 1. First-time setup (if no index exists)
 
-List all folders in `~/Library/Application Support/hyprnote/sessions/`. For each, read `_meta.json` to get title and date.
+```bash
+bun ~/.claude/skills/sync-transcripts/sync.ts calls/ --rebuild
+```
 
-### 2. Check which are new
+This scans all Hyprnote sessions, fuzzy-matches them against existing `calls/*.md` files, and creates `calls/sessions-index.json`.
 
-Check `calls/` in the knowledge base. Skip sessions that already have a corresponding markdown file (match by date + slug of title).
+### 2. Check for new sessions
 
-Show the user which sessions are new and which are already synced.
+```bash
+bun ~/.claude/skills/sync-transcripts/sync.ts calls/
+```
+
+Shows which sessions are new and which are already synced.
 
 ### 3. Convert new sessions
 
-For each new session, run the bundled `convert.ts` script:
-
 ```bash
-bun /Users/dandaka/.claude/skills/sync-transcripts/convert.ts \
-  "<session_folder_path>" \
-  "<output_markdown_path>"
+bun ~/.claude/skills/sync-transcripts/sync.ts calls/ --convert
 ```
 
-The script:
-- Reads `_meta.json` for title, date, participants
-- Reads `transcript.json` and reconstructs turn-by-turn dialogue
-  - Channel 0 = **Other** (remote participant)
-  - Channel 1 = **Me** (local user)
-  - Groups consecutive words from same channel into a single turn
-- Writes a markdown file (with `<!-- TODO: Add summary -->` placeholder in Summary section)
-- After the script runs, **read the generated markdown file**, write a 3-5 bullet summary of the call based on the transcript content, and replace the placeholder with it using the Edit tool
-- File structure:
+Converts all unsynced sessions to markdown. Each generated file has a `<!-- TODO: Add summary -->` placeholder.
 
-```markdown
-# <Title>
+### 4. Write summaries
 
-**Date:** YYYY-MM-DD
-**Participants:** <list from meta or "Unknown">
+For each newly created file:
+1. Read the generated markdown file
+2. Write a 3-5 bullet summary of the call based on the transcript content
+3. Replace the `<!-- TODO: Add summary -->` placeholder using the Edit tool
 
-## Summary
+### 5. Report
 
-<3-5 bullet point summary of key topics and decisions>
-
-## Transcript
-
-**Me:** <turn text>
-
-**Other:** <turn text>
-
-...
-```
-
-### 4. Report
-
-After syncing, list all newly created files with their titles and dates.
+List all newly created files with their titles and dates.
 
 ## Notes
 
-- Skip sessions with empty or near-empty transcripts (fewer than 10 words total)
-- The `convert.ts` script handles the JSON parsing and markdown formatting
-- For summaries: after generating the transcript text, ask Claude (yourself) to write a concise summary based on the transcript content
-- `calls/` folder should be created if it doesn't exist
+- Sessions with transcripts < 500 bytes are automatically skipped (no real content)
+- The convert script skips transcripts with fewer than 10 words (exits with code 2)
+- The index handles slug mismatches from older syncs via fuzzy date+title matching during `--rebuild`
+- Channel 0 = **Me** (local user), Channel 1 = **Other** (remote participant)

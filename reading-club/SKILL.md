@@ -40,7 +40,7 @@ When args contain URLs (not "send"):
 2. Extract: title, clean body text → Markdown
 3. Save as `reading/YYYY-MM-DD-slug.md` where slug = last URL path segment, lowercased, hyphens
 4. Create `reading/index.md` if it doesn't exist (with header row)
-5. Append row to index: `| N | [Title](url) | YYYY-MM-DD | - |`
+5. Append entry to index: `N. [Title](url) — YYYY-MM-DD`
 
 ### Article MD format
 
@@ -59,7 +59,7 @@ When args contain URLs (not "send"):
 
 When args = "send":
 
-1. Read `reading/index.md`, find all rows where Sent column = `-`
+1. Read `reading/index.md`, find all entries without ✅
 2. Load their `.md` files from `reading/`
 3. Build combined markdown `reading/_digest-tmp.md`:
    - Header: `# Reading Digest — YYYY-MM-DD`
@@ -68,7 +68,7 @@ When args = "send":
 5. Run `md-to-pdf` with Kindle A6 CSS (see style spec below)
 6. Save output as `reading/digest-YYYY-MM-DD.pdf`
 7. Send via `gog gmail send` (Bash): attach PDF, recipient = `$KINDLE_EMAIL` from `~/.claude/.env`, subject `Reading Digest YYYY-MM-DD`
-8. Update `reading/index.md`: set Sent = `✅ YYYY-MM-DD` for all sent articles
+8. Update `reading/index.md`: append `✅ YYYY-MM-DD` to each sent entry
 9. Delete temp file `reading/_digest-tmp.md`
 
 ## PDF Style — Kindle A6
@@ -144,11 +144,11 @@ md-to-pdf \
 ```markdown
 # Reading Club Index
 
-| # | Title | Added | Sent |
-|---|-------|-------|------|
-| 1 | [Article Title](https://url) | 2026-02-20 | - |
-| 2 | [Another Article](https://url) | 2026-02-19 | ✅ 2026-02-21 |
+1. [Article Title](https://url) — 2026-02-20
+2. [Another Article](https://url) — 2026-02-19 ✅ 2026-02-21
 ```
+
+Unsent: no ✅. Sent: append ✅ YYYY-MM-DD.
 
 ## Sending via gog gmail
 
