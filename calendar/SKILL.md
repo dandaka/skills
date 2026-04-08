@@ -8,6 +8,8 @@ metadata:
 allowed-tools: Bash(gog*)
 ---
 
+[![skillcheck passed](https://img.shields.io/badge/skillcheck-passed-4c1)](https://getskillcheck.com) ![score](https://img.shields.io/badge/score-94-brightgreen)
+
 # Google Calendar Manager
 
 This skill provides Google Calendar management capabilities using the `gog` command-line tool.
