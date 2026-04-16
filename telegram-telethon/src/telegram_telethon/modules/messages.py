@@ -5,6 +5,7 @@ Handles fetching, searching, sending, and editing messages.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
@@ -91,7 +92,7 @@ def format_message(msg, chat_name: str, chat_type: str, include_chat_id: bool = 
         result["reactions"] = reactions
 
     # Include reply info
-    if msg.reply_to:
+    if msg.reply_to and hasattr(msg.reply_to, 'reply_to_msg_id'):
         result["reply_to_msg_id"] = msg.reply_to.reply_to_msg_id
 
     return result
@@ -215,6 +216,90 @@ async def fetch_recent(
                 await asyncio.sleep(e.seconds)
 
     return messages
+
+
+async def fetch_bulk(
+    client: TelegramClient,
+    chats: List[Dict[str, Any]],
+    default_limit: int = 500,
+    on_chat_done=None,
+) -> None:
+    """Fetch messages from multiple chats in a single session.
+
+    Streams JSONL to stdout — one JSON line per chat result.
+    Uses min_id to only fetch messages newer than the last known message.
+
+    Args:
+        client: Authenticated TelegramClient
+        chats: List of {chat_id, chat_name, min_id, limit, offset_date}
+        default_limit: Default max messages per chat
+        on_chat_done: Optional async callback(chat_id, messages) for each completed chat
+    """
+    import sys as _sys
+
+    for chat_spec in chats:
+        chat_id = chat_spec.get("chat_id")
+        chat_name = chat_spec.get("chat_name")
+        min_id = chat_spec.get("min_id", 0)
+        limit = chat_spec.get("limit", default_limit)
+        offset_date_str = chat_spec.get("offset_date")
+
+        try:
+            # Resolve entity
+            entity = None
+            if chat_id:
+                try:
+                    entity = await client.get_entity(int(chat_id))
+                except Exception:
+                    pass
+
+            if entity is None and chat_name:
+                entity, _ = await resolve_entity(client, chat_name)
+
+            if entity is None:
+                result = {"chat_id": str(chat_id or chat_name), "error": "not_found", "messages": []}
+                _sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+                _sys.stdout.flush()
+                continue
+
+            chat_type = get_chat_type(entity)
+            name = getattr(entity, 'title', None) or getattr(entity, 'first_name', '') or "Unknown"
+            resolved_id = entity.id
+
+            kwargs: Dict[str, Any] = {"limit": limit}
+            if min_id > 0:
+                kwargs["min_id"] = min_id
+            if offset_date_str:
+                kwargs["offset_date"] = datetime.fromisoformat(offset_date_str)
+
+            messages = []
+            async for msg in client.iter_messages(entity, **kwargs):
+                formatted = format_message(msg, name, chat_type, include_chat_id=True)
+                formatted["chat_id"] = resolved_id
+                messages.append(formatted)
+
+            result = {
+                "chat_id": str(resolved_id),
+                "chat_name": name,
+                "messages": messages,
+            }
+            _sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            _sys.stdout.flush()
+
+            if on_chat_done:
+                await on_chat_done(resolved_id, messages)
+
+        except FloodWaitError as e:
+            logger.warning(f"Rate limited on {chat_name or chat_id}, waiting {e.seconds}s...")
+            await asyncio.sleep(e.seconds)
+            result = {"chat_id": str(chat_id or chat_name), "error": f"flood_wait:{e.seconds}", "messages": []}
+            _sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            _sys.stdout.flush()
+        except Exception as e:
+            logger.warning(f"Error fetching {chat_name or chat_id}: {e}")
+            result = {"chat_id": str(chat_id or chat_name), "error": str(e), "messages": []}
+            _sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            _sys.stdout.flush()
 
 
 async def search_messages(

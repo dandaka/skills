@@ -6,3 +6,6 @@
 	path = traul
 	url = git@github.com:dandaka/traul.git
 	branch = main
+[submodule "nano-banana"]
+	path = nano-banana
+	url = https://github.com/dandaka/nano-banana-structured.git

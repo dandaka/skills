@@ -1,7 +1,7 @@
 ---
 name: coaching-weekly
 description: Weekly structured coaching review. Analyzes daily check-in patterns, scores priority progress, conducts time audit, sets next week's commitments. Logs to knowledge base.
-compatibility: Requires knowledge base at ~/projects/knowledge-base
+compatibility: Requires knowledge base at ~/projects/dn-kb
 metadata:
   author: dandaka
   version: "1.0"
@@ -19,12 +19,12 @@ Deep structured review of the past week. This is where patterns get surfaced, pr
 ### Step 1: Load Data
 
 Read ALL daily logs from the past 7 days:
-- `~/projects/knowledge-base/coaching/daily/` — all files from this week
-- `~/projects/knowledge-base/coaching/priorities.md` — current priorities
-- `~/projects/knowledge-base/coaching/weekly/` — last week's review (if exists)
-- `~/projects/knowledge-base/profile/goals.md` — quarterly targets
-- `~/projects/knowledge-base/profile/constraints.md` — for financial update
-- `~/projects/knowledge-base/coaching/meditation-log.md` — meditation consistency
+- `~/projects/dn-kb/coaching/daily/` — all files from this week
+- `~/projects/dn-kb/coaching/priorities.md` — current priorities
+- `~/projects/dn-kb/coaching/weekly/` — last week's review (if exists)
+- `~/projects/dn-kb/profile/goals.md` — quarterly targets
+- `~/projects/dn-kb/profile/constraints.md` — for financial update
+- `~/projects/dn-kb/coaching/meditation-log.md` — meditation consistency
 
 ### Step 2: Week Summary Dashboard
 
@@ -85,12 +85,12 @@ Based on the full week's data, provide analysis:
 ### Step 5: Set Next Week's Priorities
 
 If priorities changed based on the review:
-- Update `~/projects/knowledge-base/coaching/priorities.md`
+- Update `~/projects/dn-kb/coaching/priorities.md`
 - Log the change with reason in the priority change log
 
 ### Step 6: Log
 
-Write the review to `~/projects/knowledge-base/coaching/weekly/YYYY-WXX.md`:
+Write the review to `~/projects/dn-kb/coaching/weekly/YYYY-WXX.md`:
 
 ```markdown
 # Weekly Review: Week XX (YYYY-MM-DD to YYYY-MM-DD)
@@ -130,7 +130,7 @@ Write the review to `~/projects/knowledge-base/coaching/weekly/YYYY-WXX.md`:
 ### Step 7: Update Constraints if Needed
 
 If financial situation changed or new patterns emerged:
-- Update `~/projects/knowledge-base/profile/constraints.md`
+- Update `~/projects/dn-kb/profile/constraints.md`
 
 ## Tone
 
