@@ -3,6 +3,8 @@ name: sheets-cli
 description: Read, write, and update Google Sheets data via CLI. Use when the user asks to read spreadsheet data, update cells, append rows, or work with Google Sheets. Triggers on mentions of spreadsheets, sheets, Google Sheets, tabular data in the cloud, or specific sheet names like "Projects" or "Tasks".
 ---
 
+[![skillcheck passed](https://img.shields.io/badge/skillcheck-passed-4c1)](https://getskillcheck.com) ![score](https://img.shields.io/badge/score-95-brightgreen)
+
 # sheets-cli
 
 CLI for Google Sheets primitives. Read tables, append rows, update cells by key or index, batch operations.

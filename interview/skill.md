@@ -3,6 +3,8 @@ name: interview
 description: Conduct a structured interview about an implementation plan to clarify requirements, explore tradeoffs, and identify gaps. Use when the user says "interview me", "question the plan", "validate the plan", or wants critical review of a plan before implementation. Works with plans from files OR plans discussed in the current conversation.
 ---
 
+[![skillcheck passed](https://img.shields.io/badge/skillcheck-passed-4c1)](https://getskillcheck.com) ![score](https://img.shields.io/badge/score-99-brightgreen)
+
 ## Plan Source
 
 Determine where the plan is:
