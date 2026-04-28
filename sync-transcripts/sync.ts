@@ -11,7 +11,7 @@
  *   bun sync.ts <calls_dir> --rebuild    # rebuild index from existing calls/*.md
  */
 
-import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from "fs";
+import { readdirSync, readFileSync, writeFileSync, existsSync, statSync, renameSync } from "fs";
 import { join } from "path";
 
 const CALLS_DIR = process.argv[2];
@@ -156,8 +156,27 @@ if (command === "--rebuild") {
 
   for (const session of sessions) {
     if (index[session.id]) {
-      if (!index[session.id].synced && existing.has(index[session.id].filename)) {
-        index[session.id].synced = true;
+      const entry = index[session.id];
+      if (!entry.synced && existing.has(entry.filename)) {
+        entry.synced = true;
+      }
+      // If title was empty at sync time but is now set, rename the file
+      if (!entry.title && session.title && entry.synced) {
+        const newFilename = expectedFilename(session);
+        if (newFilename !== entry.filename && existing.has(entry.filename)) {
+          const oldPath = join(CALLS_DIR, entry.filename);
+          const newPath = join(CALLS_DIR, newFilename);
+          // Update H1 in the markdown file
+          const content = readFileSync(oldPath, "utf-8");
+          const updated = content.replace(/^# .*$/m, `# ${session.title}`);
+          writeFileSync(oldPath, updated, "utf-8");
+          renameSync(oldPath, newPath);
+          console.log(`Renamed: ${entry.filename} → ${newFilename}`);
+          entry.filename = newFilename;
+        } else if (!existing.has(entry.filename)) {
+          entry.filename = expectedFilename(session);
+        }
+        entry.title = session.title;
       }
       continue;
     }

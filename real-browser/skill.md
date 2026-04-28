@@ -61,10 +61,15 @@ curl -s http://localhost:9222/json/version
 
 **CRITICAL: Always use `--cdp 9222 --session <name>` on EVERY command.** The `--cdp` flag attaches to Chrome's debugging port, `--session` provides named session isolation for multi-tab work.
 
+**CRITICAL: Generate a unique 6-char alphanumeric session ID at the start of every agent run** — never use `main` or a hardcoded name. Two agents sharing a session name will overwrite each other's tab silently.
+
 ```bash
-agent-browser --cdp 9222 --session main snapshot -i
-agent-browser --cdp 9222 --session main click @e1
-agent-browser --cdp 9222 --session main screenshot /tmp/page.png
+# At the top of every agent — generate once, reuse throughout
+SESSION=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 6)
+
+agent-browser --cdp 9222 --session "$SESSION" snapshot -i
+agent-browser --cdp 9222 --session "$SESSION" click @e1
+agent-browser --cdp 9222 --session "$SESSION" screenshot /tmp/page.png
 ```
 
 No separate `connect` step needed — `--cdp` handles the connection on each invocation.
