@@ -34,16 +34,15 @@ sleep 1
 
 ## Launch Chrome Beta
 
+First, check if Chrome Beta is already running with the debug port:
+
 ```bash
-osascript -e 'quit app "Google Chrome Beta"' 2>/dev/null
-sleep 3
-pkill -f "Google Chrome Beta" 2>/dev/null
-sleep 1
-pkill -9 -f "Google Chrome Beta" 2>/dev/null
-sleep 1
+curl -s http://localhost:9222/json/version
 ```
 
-Then launch in background (`run_in_background: true`):
+**If the check succeeds** — Chrome is already running with remote debugging. Skip launching and proceed to "Connect agent-browser".
+
+**If the check fails** — Chrome is not running (or running without the debug port). Launch in background (`run_in_background: true`):
 
 ```bash
 "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta" --remote-debugging-port=9222 --user-data-dir="$HOME/.chrome-beta-profile"
@@ -54,6 +53,8 @@ Wait 4s, then verify:
 ```bash
 curl -s http://localhost:9222/json/version
 ```
+
+**If Chrome is running WITHOUT `--remote-debugging-port`:** ask the user before shutting it down — they may have open tabs or work in progress. If they confirm, use the "Shutdown Chrome Beta" section above, then relaunch with the flag.
 
 **Key:** `--user-data-dir` is REQUIRED. Without it Chrome refuses to enable remote debugging on a default profile.
 

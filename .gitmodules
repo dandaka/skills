@@ -11,5 +11,5 @@
 	url = https://github.com/dandaka/nano-banana-structured.git
 [submodule "browser-harness"]
 	path = browser-harness
-	url = https://github.com/browser-use/browser-harness.git
+	url = https://github.com/dandaka/browser-harness.git
 	branch = main
