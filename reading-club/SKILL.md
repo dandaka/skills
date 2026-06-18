@@ -67,7 +67,7 @@ When args = "send":
    - Each article starts with its H1 title and source URL
 5. Run `md-to-pdf` with Kindle A6 CSS (see style spec below)
 6. Save output as `reading/digest-YYYY-MM-DD.pdf`
-7. Send via `gog gmail send` (Bash): attach PDF, recipient = `$KINDLE_EMAIL` from `~/.claude/.env`, subject `Reading Digest YYYY-MM-DD`
+7. Send via `gog gmail send` using `ni-gate` (see Sending section below). Use a unique filename for the attachment (e.g. append `-vN`) to avoid Kindle caching the old version
 8. Update `reading/index.md`: append `✅ YYYY-MM-DD` to each sent entry
 9. Delete temp file `reading/_digest-tmp.md`
 
@@ -131,9 +131,11 @@ img { max-width: 100%; }
 
 ## Running md-to-pdf
 
+IMPORTANT: Use `$HOME` not `~` for the stylesheet path — tilde is NOT expanded by md-to-pdf and will silently fail, causing the default tiny-font style to be used instead.
+
 ```bash
 md-to-pdf \
-  --stylesheet ~/.claude/skills/reading-club/kindle-a6.css \
+  --stylesheet "$HOME/.claude/skills/reading-club/kindle-a6.css" \
   --pdf-options '{"width":"108mm","height":"144mm","margin":{"top":"8mm","right":"8mm","bottom":"8mm","left":"8mm"}}' \
   reading/_digest-tmp.md
 # Output: reading/_digest-tmp.pdf — rename to digest-YYYY-MM-DD.pdf
@@ -152,15 +154,20 @@ Unsent: no ✅. Sent: append ✅ YYYY-MM-DD.
 
 ## Sending via gog gmail
 
-Send the PDF using `gog gmail send` directly (use Bash, not the mail skill).
-`KINDLE_EMAIL` and `GOOGLE_ACCOUNT` are loaded from `~/.claude/.env`.
+Send the PDF using `ni-gate` to inject secrets, then call `gog gmail send` via a shell script.
+Do NOT use `source ~/.claude/.env` — vars will be empty. Do NOT pass `~` in paths.
 
 ```bash
-source ~/.claude/.env
+# Write a temp script, then run via ni-gate:
+cat > /tmp/send-digest.sh << 'EOF'
+#!/bin/sh
 gog gmail send \
-  --account $GOOGLE_ACCOUNT \
+  --account "$GOOGLE_ACCOUNT" \
   --to "$KINDLE_EMAIL" \
   --subject "Reading Digest YYYY-MM-DD" \
   --body "Reading digest — N articles." \
-  --attach "~/projects/knowledge-base/reading/digest-YYYY-MM-DD.pdf"
+  --attach "/absolute/path/to/reading/digest-YYYY-MM-DD.pdf"
+EOF
+chmod +x /tmp/send-digest.sh
+ni-gate run KINDLE_EMAIL GOOGLE_ACCOUNT -- sh /tmp/send-digest.sh
 ```

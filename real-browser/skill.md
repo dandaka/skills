@@ -17,7 +17,11 @@ Doing so sends automation signals (Playwright-controlled browser) that websites 
 
 **DO NOT use `agent-browser --session <name> connect 9222`.** The `connect` subcommand's Rust daemon creates a new `about:blank` tab instead of attaching to existing pages. This is a known bug (verified 2026-04-03, agent-browser v0.22.3).
 
-## Shutdown Chrome Beta (graceful)
+## CRITICAL: Never close Chrome without being asked
+
+**DO NOT** quit, kill, or restart Chrome unless the user explicitly asks you to. Closing Chrome interrupts the user's workflow — they may be operating the browser manually alongside the agent. If you need Chrome restarted (e.g. to add `--remote-debugging-port`), **ask the user first**.
+
+## Shutdown Chrome Beta (graceful — only when user requests)
 
 Always shut down Chrome gracefully to avoid the "not shut down correctly" banner on next launch. Escalate from gentle to forceful:
 
@@ -54,7 +58,7 @@ Wait 4s, then verify:
 curl -s http://localhost:9222/json/version
 ```
 
-**If Chrome is running WITHOUT `--remote-debugging-port`:** ask the user before shutting it down — they may have open tabs or work in progress. If they confirm, use the "Shutdown Chrome Beta" section above, then relaunch with the flag.
+**If Chrome is running WITHOUT `--remote-debugging-port`:** ask the user to close and relaunch it — never close Chrome yourself. Explain they need to relaunch with the debug port flag.
 
 **Key:** `--user-data-dir` is REQUIRED. Without it Chrome refuses to enable remote debugging on a default profile.
 

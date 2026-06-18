@@ -8,14 +8,14 @@
 
 body {
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 11pt;
+  font-size: 16pt;
   line-height: 1.5;
   color: #000;
   max-width: 100%;
 }
 
 h1 {
-  font-size: 14pt;
+  font-size: 20pt;
   margin-top: 1em;
   margin-bottom: 0.5em;
   page-break-before: always;
@@ -25,8 +25,8 @@ h1:first-of-type {
   page-break-before: avoid;
 }
 
-h2 { font-size: 12pt; margin-top: 0.8em; margin-bottom: 0.3em; }
-h3 { font-size: 11pt; margin-top: 0.6em; margin-bottom: 0.3em; }
+h2 { font-size: 18pt; margin-top: 0.8em; margin-bottom: 0.3em; }
+h3 { font-size: 16pt; margin-top: 0.6em; margin-bottom: 0.3em; }
 
 p { margin: 0.4em 0; }
 
