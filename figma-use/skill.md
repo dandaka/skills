@@ -425,7 +425,7 @@ open /tmp/check.png
 
 | Symptom | Fix |
 |---------|-----|
-| `figma-use status` says not connected | Run `figma-use patch`, restart Figma |
+| `figma-use status` says not connected | Run `figma-use patch`, restart Figma. Note: `status` may fail even when `eval`/`page list` work — test with `figma-use eval --json 'return figma.currentPage.name'` |
 | CDP port not opening after launch | Re-run `figma-use patch` (Figma update may have reverted it) |
 | Port 9222 already in use | Kill Chrome's debugging instance |
 | Auth lost after restart | Sign back into Figma (expected behavior) |
@@ -433,3 +433,54 @@ open /tmp/check.png
 | `figma.*` is undefined | You're using raw CDP, not `figma-use eval` |
 | Async eval times out on many nodes | Batch to ~30 nodes per call (CDP 10s timeout) |
 | `figma-use find --type COMPONENT` empty | Use `figma-use eval` with `findAll` instead |
+| `Failed to inject RPC` / `loadFontAsync` undefined | Figma switched from webpack to rspack — apply the hotpatch below |
+
+### Hotpatch: Figma 126.6+ rspack migration (figma-use 0.13.3)
+
+Figma 126.6+ replaced `webpackChunk_figma_web_bundler` with `rspackChunk_figma_web_bundler` and changed internal module structure. figma-use 0.13.3 fails with `loadFontAsync` errors because:
+1. It looks for `webpackChunk_figma_web_bundler` which no longer exists
+2. Its function matcher picks the config factory instead of the actual `defineVm`
+
+Apply this patch to the installed figma-use CLI (`/opt/homebrew/lib/node_modules/figma-use/dist/cli/index.js` or equivalent):
+
+**Change 1** — chunk name (search for `webpackChunk_figma_web_bundler.push`):
+```js
+// BEFORE:
+if (!window.__webpackRequire__) {
+    window.webpackChunk_figma_web_bundler.push([
+
+// AFTER:
+if (!window.__webpackRequire__) {
+    var _chunk = window.webpackChunk_figma_web_bundler || window.rspackChunk_figma_web_bundler;
+    _chunk.push([
+```
+
+**Change 2** — function matcher (search for `apiMode:e,pluginID`):
+```js
+// BEFORE:
+  for (const id in r.m) {
+    if (r.m[id].toString().includes('apiMode:e,pluginID')) {
+      const hit = Object.values(r(id)).find(
+        v => typeof v === 'function' && v.toString().includes('apiMode')
+      );
+
+// AFTER:
+  for (const id in r.m) {
+    const src = r.m[id].toString();
+    if (src.includes('apiMode') && src.includes('pluginID') && src.includes('sceneGraph')) {
+      const hit = Object.values(r(id)).find(
+        v => typeof v === 'function' && v.length === 1 && v.toString().includes('apiMode') && v.toString().includes('sceneGraph')
+      );
+```
+
+The `v.length === 1` filter ensures we pick the function that takes one config argument (`defineVm({...})`), not the zero-argument config factory. The `sceneGraph` check further narrows the search.
+
+**Why this breaks**: rspack uses different minified parameter names (`apiMode:t,pluginID` vs `apiMode:e,pluginID`), and the module now exports both a config factory (0 args) and the actual defineVm (1 arg). The old matcher found the factory first.
+
+**Verify after patching**:
+```bash
+figma-use eval --json 'return figma.currentPage.name'
+# Should return the current page name
+```
+
+Note: `figma-use status` may still report "not connected" due to a separate check, but `eval`, `page list`, `render`, and all other commands work correctly.
