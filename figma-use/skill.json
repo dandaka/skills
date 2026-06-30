@@ -1,0 +1,7 @@
+{
+  "name": "figma-use",
+  "description": "Figma automation via the figma-use CLI. Use when the user needs to create, modify, or inspect Figma designs programmatically — rendering JSX components, syncing design tokens, querying nodes, exporting assets, managing variables and pages, or troubleshooting Figma CDP connections.",
+  "version": "1.0.0",
+  "author": "dandaka",
+  "userInvocable": true
+}
