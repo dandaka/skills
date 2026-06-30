@@ -1,8 +1,8 @@
 ---
 name: figma-use
 description: >
-  Figma automation via the figma-use CLI (by dannote). Use when the user needs to create, modify, or inspect Figma designs programmatically. Triggers on requests to render components in Figma, sync design tokens, query or find nodes, export assets, manage variables/pages, compose screens from component instances, delta-sync web app CSS against Figma properties, or troubleshoot Figma CDP connections. Also triggers on mentions of "figma-use", "figma automation", "figma cli", "render to figma", "figma eval", or "design system sync".
-allowed-tools: Bash(figma-use:*), Bash(echo:*), Bash(npx:*)
+  Figma automation via the figma-use CLI (by dannote). Use when the user needs to create, modify, or inspect Figma designs programmatically. Triggers on requests to render components in Figma, sync design tokens, query or find nodes, export assets, manage variables/pages, compose screens from component instances, delta-sync web app CSS against Figma properties, or troubleshoot Figma CDP connections. Also triggers on mentions of "figma-use", "figma automation", "figma cli", "render to figma", "figma eval", or "design system sync". Never use computer-use (screenshot/click) for Figma — always use figma-use CLI.
+allowed-tools: Bash(figma-use:*), Bash(echo:*), Bash(npx:*), Bash(pkill:*), Bash(codesign:*), Bash(python3:*), Bash(nohup:*), Bash(grep:*), Bash(open:*)
 ---
 
 # figma-use — Figma Automation CLI
@@ -11,18 +11,140 @@ allowed-tools: Bash(figma-use:*), Bash(echo:*), Bash(npx:*)
 
 **IMPORTANT**: This is NOT `figma-ds-cli` — they are completely different packages. Never install or use `figma-ds-cli`.
 
+**IMPORTANT**: Never use computer-use MCP tools (screenshot, click, type) to interact with Figma. Always use `figma-use` CLI. If connection is broken, fix it — don't fall back to computer-use.
+
 ## Setup
 
 ```bash
 npm install -g figma-use
-figma-use patch              # patch Figma 126+ to allow CDP (redo after Figma updates)
-# Restart Figma after patching
-figma-use status             # verify connection
 ```
 
-If `figma-use status` fails: re-run `figma-use patch`, then fully quit and reopen Figma.
+### Patching Figma (required for Figma 126+)
 
-Port note: Chrome must NOT be using port 9222. If Chrome debug is running, figma-use may conflict — kill it or use a different port for Chrome (`--remote-debugging-port=9224`).
+Figma 126+ strips `--remote-debugging-port` at startup via `removeSwitch()`. The patch flips one byte in `app.asar` to neutralize this. Re-run after every Figma auto-update.
+
+```bash
+#!/usr/bin/env bash
+# patch-figma.sh — Re-enable raw CDP on Figma Desktop 126+
+set -euo pipefail
+
+ASAR="/Applications/Figma.app/Contents/Resources/app.asar"
+BACKUP_DIR="$HOME/.figma-debug-start/backups"
+OLD='remote-debugging-port'
+NEW='remote-debugXing-port'
+
+[ -f "$ASAR" ] || { echo "ERROR: $ASAR not found"; exit 1; }
+[ -w "$ASAR" ] || { echo "ERROR: $ASAR not writable (try: sudo $0)"; exit 1; }
+
+if LC_ALL=C grep -q -a "$NEW" "$ASAR"; then
+  echo "Already patched. Nothing to do."
+  exit 0
+fi
+if ! LC_ALL=C grep -q -a "$OLD" "$ASAR"; then
+  echo "ERROR: target string '$OLD' not found — Figma version may have changed the code."
+  exit 1
+fi
+
+mkdir -p "$BACKUP_DIR"
+TS=$(date +%Y%m%d-%H%M%S)
+BAK="$BACKUP_DIR/app.asar.$TS.bak"
+cp "$ASAR" "$BAK"
+echo "Backup: $BAK"
+
+python3 - "$ASAR" "$OLD" "$NEW" <<'PY'
+import sys
+p, old, new = sys.argv[1], sys.argv[2].encode(), sys.argv[3].encode()
+assert len(old) == len(new), "length mismatch would corrupt asar"
+b = open(p, 'rb').read()
+n = b.count(old)
+open(p, 'wb').write(b.replace(old, new))
+print(f"Patched {n} occurrence(s); size unchanged ({len(b)} bytes).")
+PY
+
+codesign --force --deep --sign - /Applications/Figma.app
+codesign --verify --deep /Applications/Figma.app && echo "Signature OK"
+echo "Done. Now launch Figma with CDP enabled."
+```
+
+Alternatively, `figma-use patch` does the same thing built-in.
+
+### Launching Figma with CDP
+
+`figma-use` v0.13.3 hardcodes CDP port **9222**. Figma must own that port. If Chrome is using 9222, kill it or move Chrome to another port (e.g. `--remote-debugging-port=9224`).
+
+```bash
+#!/usr/bin/env bash
+# launch-figma.sh — Launch patched Figma with CDP and print the WebSocket URL
+# NOTE: HTTP /json discovery endpoints are gated by modern Chromium and hang.
+# The reliable handle is the "DevTools listening on ws://..." line from stderr.
+set -euo pipefail
+
+PORT="${1:-9222}"   # figma-use hardcodes 9222, so default to that
+BIN="/Applications/Figma.app/Contents/MacOS/Figma"
+LOG="/tmp/figma-stderr.log"
+
+echo "Killing any running Figma..."
+pkill -9 -f 'Figma.app/Contents/MacOS/Figma' 2>/dev/null || true
+pkill -9 -f 'Figma Helper' 2>/dev/null || true
+sleep 3
+
+echo "Launching Figma with CDP on port $PORT..."
+nohup "$BIN" --remote-debugging-port="$PORT" '--remote-allow-origins=*' >"$LOG" 2>&1 &
+echo "pid=$!"
+
+# Wait for the DevTools ws URL to appear
+for i in $(seq 1 20); do
+  WS=$(grep -oE "ws://127.0.0.1:$PORT/devtools/browser/[a-f0-9-]+" "$LOG" 2>/dev/null | tail -1 || true)
+  [ -n "$WS" ] && break
+  sleep 1
+done
+
+if [ -z "${WS:-}" ]; then
+  echo "ERROR: no DevTools ws URL after 20s. Tail of $LOG:"; tail -15 "$LOG"; exit 1
+fi
+
+echo "CDP_WS=$WS"
+echo "$WS" > /tmp/figma-cdp-ws.txt
+echo "(also saved to /tmp/figma-cdp-ws.txt)"
+```
+
+### Unpatching (restore stock Figma)
+
+```bash
+#!/usr/bin/env bash
+# unpatch-figma.sh — Restore the most recent app.asar backup
+set -euo pipefail
+
+ASAR="/Applications/Figma.app/Contents/Resources/app.asar"
+BACKUP_DIR="$HOME/.figma-debug-start/backups"
+
+LATEST=$(ls -t "$BACKUP_DIR"/app.asar.*.bak 2>/dev/null | head -1 || true)
+[ -n "$LATEST" ] || { echo "ERROR: no backup found in $BACKUP_DIR"; exit 1; }
+
+echo "Restoring: $LATEST"
+pkill -9 -f 'Figma.app/Contents/MacOS/Figma' 2>/dev/null || true
+sleep 2
+cp "$LATEST" "$ASAR"
+codesign --force --deep --sign - /Applications/Figma.app
+codesign --verify --deep /Applications/Figma.app && echo "Signature OK"
+echo "Reverted to stock. CDP is now disabled again."
+```
+
+### Quick Start (TL;DR)
+
+```bash
+figma-use patch              # or run patch-figma.sh manually
+# Quit and reopen Figma, or run launch-figma.sh
+figma-use status             # verify: "✓ Connected to Figma"
+```
+
+### Port Rules
+
+| Port | Owner | Notes |
+|------|-------|-------|
+| 9222 | Figma (required) | `figma-use` hardcodes this — Figma must own it |
+| 9224 | Chrome Beta (optional) | Use for web app CSS extraction via `agent-browser` |
+| 9222 | Chrome (conflict!) | If Chrome has 9222, kill it or move to 9224 |
 
 ## Core Commands
 
