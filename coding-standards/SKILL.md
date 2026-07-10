@@ -1,6 +1,6 @@
 ---
 name: coding-standards
-description: Ensure the current project has a docs/coding-standards.md checklist and use it to review code for tidiness, separation of concerns, maintainability, stale assumptions, leftover experimental code, and doc drift. Use this skill whenever the user asks to check coding standards, review code quality, "is this tidy", "does this follow our standards", set up a coding standards doc, or before finishing/merging a change.
+description: Ensure the current project has a docs/coding-standards.md checklist and use it to review code against the default stack (Bun, TypeScript, Drizzle, Biome, Bun-workspaces monorepo, red/green TDD) and quality principles — tidiness, separation of concerns, maintainability, stale assumptions, leftover experimental code, and doc drift. Use this skill whenever the user asks to check coding standards, review code quality, "is this tidy", "does this follow our standards", set up a coding standards doc, scaffold a new project's conventions, or before finishing/merging a change.
 compatibility: Requires a project with a docs/ directory (created if missing)
 metadata:
   author: dandaka
