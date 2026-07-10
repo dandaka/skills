@@ -4,20 +4,8 @@ A short checklist to review code against. Each item is a question — answer it
 honestly for the code under review. The goal is code that a new reader (human or
 agent) can understand, trust, and safely change.
 
-## Default stack & project structure
-
-New projects start from this stack unless there's a concrete reason to deviate.
-When reviewing, treat departures from it as something to justify, not a default.
-
-- **Runtime & language**: [Bun](https://bun.sh) + TypeScript, `strict: true`. Run TS directly with `bun`; use `bun test` as the runner.
-- **Package manager**: Bun (never npm/yarn/pnpm).
-- **Monorepo**: Bun workspaces (`"workspaces": ["packages/*"]`). Cross-package commands via `bun --filter '@scope/pkg'`. No turborepo/nx unless the graph genuinely needs it. Each package owns its `package.json` and `tsconfig.json`.
-- **Database**: Postgres or SQLite via [Drizzle ORM](https://orm.drizzle.team). Schema in `src/schema.ts`, numbered migrations in `drizzle/` (`0007_add_users.sql`), config in `drizzle.config.ts`.
-- **Linter & formatter**: [Biome](https://biomejs.dev) (one tool for both) via `biome.json`. Run `biome check --write` on commit (git hook + `lint-staged`). No ESLint/Prettier.
-- **Docs**: a `docs/` folder at the repo root for specs, plans, runbooks, research — kebab-case, date-prefixed where it's a dated artifact (`docs/research/2026-06-23-image-ocr-pipeline.md`).
-- **Work logs**: a `docs/logs/` folder for dated session/work logs (`docs/logs/2026-07-10-<topic>.md`) — what was done, why, and what's next, so the next session (human or agent) has continuity.
-- **Naming**: kebab-case for files and directories (`job-publisher.ts`). Organize by feature (a directory per feature) once a package grows; keep it flat while small.
-- **Secrets**: injected at runtime via `infisical run` — never committed.
+> The default stack and project layout live in `docs/project-setup.md` — that's a
+> one-time bootstrap reference. This file is the recurring review checklist.
 
 ## Test-driven development (red/green)
 
