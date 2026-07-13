@@ -41,6 +41,7 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `calendar` | Manage Google Calendar | `gog` CLI |
 | `cv-generator` | Generate PDF CVs from markdown | `md-to-pdf`, Libertinus Serif font |
 | `discord-post` | Generate Discord announcements | — |
+| `frontend-standards` | Evidence-based Figma↔browser frontend protocol: preflight, intent intake, measure→experiment→commit debugging, design vocabulary | `figma-use`, `agent-browser` (CDP) |
 | `interview` | Structured interview for implementation plans | — |
 | `job-search` | Scrape PM jobs, deduplicate, post to Google Sheet | `bun`, `sheets-cli` |
 | `linear` | Manage Linear issues and projects | `bun` |
