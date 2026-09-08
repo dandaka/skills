@@ -1,275 +1,208 @@
 ---
 name: real-browser
-description: Launch and control real Chrome Beta with persistent login sessions. Use when automating websites that detect Playwright (LinkedIn, etc.) or when running parallel browser sessions for job applications.
-allowed-tools: Bash(agent-browser:*), Bash(pkill:*), Bash(curl:*), Bash(sleep:*)
+description: Attach agent-browser to the real Chrome Beta instances running on this machine (persistent logins, one profile per CDP port) without launching Playwright-controlled browsers. Use for any site that detects automation, for QA at https://dev.bracos.app, or when several agents need the same browser at once.
+allowed-tools: Bash(agent-browser:*), Bash(curl:*), Bash(sleep:*), Bash(launchctl:*)
 ---
 
-# Browser Automation - Real Chrome Beta
+# Real Chrome Beta via agent-browser
 
-## CRITICAL: Never use agent-browser to launch Chrome
-
-**DO NOT** use `agent-browser open` or `agent-browser --headed` to launch a browser.
-Doing so sends automation signals (Playwright-controlled browser) that websites detect.
-
-**CORRECT workflow:**
-1. Launch Chrome Beta with `--remote-debugging-port=9222` and `--user-data-dir`
-2. Use `--cdp 9222 --session <name>` on ALL commands (combines CDP attach + named session)
-
-**DO NOT use `agent-browser --session <name> connect 9222`.** The `connect` subcommand's Rust daemon creates a new `about:blank` tab instead of attaching to existing pages. This is a known bug (verified 2026-04-03, agent-browser v0.22.3).
-
-## CRITICAL: Never close Chrome without being asked
-
-**DO NOT** quit, kill, or restart Chrome unless the user explicitly asks you to. Closing Chrome interrupts the user's workflow — they may be operating the browser manually alongside the agent. If you need Chrome restarted (e.g. to add `--remote-debugging-port`), **ask the user first**.
-
-## Shutdown Chrome Beta (graceful — only when user requests)
-
-Always shut down Chrome gracefully to avoid the "not shut down correctly" banner on next launch. Escalate from gentle to forceful:
+This skill covers only what is specific to this machine and to attaching to a
+human-owned Chrome. The agent-browser command reference is **not** duplicated
+here: it ships inside the CLI, version-matched, and is always more current
+than anything copied into this file.
 
 ```bash
-osascript -e 'quit app "Google Chrome Beta"' 2>/dev/null
-sleep 3
-pkill -f "Google Chrome Beta" 2>/dev/null
-sleep 1
-pkill -9 -f "Google Chrome Beta" 2>/dev/null
-sleep 1
+agent-browser skills get core          # overview + common patterns (read once per session)
+agent-browser skills get core --full   # full command reference, tab pinning, restore, batch
+agent-browser <command> --help         # per-command help
 ```
 
-**Never start with `pkill -9`.** AppleScript `quit` lets Chrome save session state. SIGTERM (`pkill` without `-9`) is the fallback. SIGKILL (`-9`) is last resort only.
+Verified against agent-browser 0.34.0 on 2026-09-08 (latest on npm at that
+time: 0.37.0). Everything below relies on `--pin-tab`, present in 0.34.0; older installs
+must upgrade first.
 
-## Launch Chrome Beta
+## Profiles and ports on this machine
 
-First, check if Chrome Beta is already running with the debug port:
+Each Chrome Beta profile is its own process on its own CDP port. Pick the
+port by what you need, never by habit.
+
+| Port | Profile dir | Owner / purpose | Managed by |
+|------|-------------|-----------------|------------|
+| 9222 | `~/.chrome-beta-profile-financas` | Founder's personal working browser (finance, banking, ads accounts). Many user tabs open. | Launched by hand |
+| 9223 | `~/.chrome-beta-profile` | Bracos main: Facebook account 1, dev.bracos.app QA, general agent work | launchd `app.bracos.chrome-beta-cdp` |
+| 9224 | (forwarder) | `socat` forward of 9223 bound on `0.0.0.0` for the VPS scrapers. Same browser as 9223. Do not use locally. | launchd `app.bracos.chrome-cdp-forwarder` |
+| 9225 | `~/.chrome-beta-profile-acct2` | Facebook account 2. Runs behind a proxy with images disabled. Scraper only. | launchd `app.bracos.chrome-beta-cdp-acct2` |
+| 9226 | Figma desktop | Electron, not Chrome. Belongs to the `figma-use` skill. | Figma app |
+
+Defaults:
+
+- **Bracos work (QA, Facebook, anything the founder's Bracos account is logged into): `--cdp 9223`.**
+- Personal accounts the founder is logged into in their day-to-day browser: `--cdp 9222`, and only when the task explicitly needs that login.
+- 9225 is production scraping infrastructure. Do not attach unless the task is the acct2 scraper itself.
+
+Check what is up before attaching:
 
 ```bash
-curl -s http://localhost:9222/json/version
+for p in 9222 9223 9225; do printf "%s " $p; curl -s -m 2 http://localhost:$p/json/version | grep -o '"Browser": "[^"]*"' || echo down; done
 ```
 
-**If the check succeeds** — Chrome is already running with remote debugging. Skip launching and proceed to "Connect agent-browser".
+9223 and 9225 are restarted by launchd every day at 05:00. That restart also
+kills every agent-browser daemon on the machine, so a session that lives
+across 05:00 must expect a fresh daemon and re-bind its tab.
 
-**If the check fails** — Chrome is not running (or running without the debug port). Launch in background (`run_in_background: true`):
+## The three rules
+
+1. **Never launch a browser through agent-browser.** No `agent-browser open`
+   without `--cdp`, no `--headed`, no `--profile`. Those start a
+   Playwright-controlled Chromium, which the target sites detect, and they
+   do not carry the persistent logins. Always attach to a running Chrome
+   with `--cdp <port>`.
+2. **Never quit, kill or restart Chrome, and never `pkill agent-browser`.**
+   The founder works in these windows, and the production Facebook scraper
+   keeps its own long-lived agent-browser daemons on 9223 and 9225. A global
+   `pkill` takes production down. To end your own work, close your own
+   session (below). If Chrome is broken and you think it needs a restart,
+   say so and stop.
+3. **Every command carries `--cdp <port> --session <id>`, and the first
+   command of the session also carries `--pin-tab`.** Without a pin, `open`
+   navigates whatever tab is active in the shared browser, which may be the
+   founder's or another agent's.
+
+## Start a session
 
 ```bash
-"/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta" --remote-debugging-port=9222 --user-data-dir="$HOME/.chrome-beta-profile"
+PORT=9223
+SESSION=qa-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6)   # unique per agent run
+# `agent-browser session id --prefix qa` is stable per checkout: fine for one long-lived
+# loop, wrong for parallel agents started from the same repo (they would share a tab)
+
+agent-browser --cdp $PORT --session "$SESSION" --pin-tab open "https://dev.bracos.app"
+agent-browser --cdp $PORT --session "$SESSION" snapshot -i
+agent-browser --cdp $PORT --session "$SESSION" click @e3
 ```
 
-Wait 4s, then verify:
+Put `PORT` and `SESSION` in variables at the top of the agent and reuse them
+on every call. Never use `default`, `main` or another guessable session name;
+two agents on the same name share one daemon and one tab.
+
+What `--pin-tab` gives you:
+
+- The first attach opens a **fresh tab** for this session instead of adopting
+  the active one. Nothing you do touches other tabs.
+- The binding is by CDP target id and persists in
+  `~/.agent-browser/<session>.target`, so it survives daemon restarts.
+- Tabs opened by the founder or other sessions never become your active tab.
+- The flag is sticky per session. Pass it once; later commands may omit it.
+  `--no-pin-tab` turns it off again.
+
+If the bound tab disappears (the founder closed it, the 05:00 restart, the
+cleanup job), commands fail with `code: "tab_gone"` instead of silently
+acting on someone else's tab. Recover explicitly:
 
 ```bash
-curl -s http://localhost:9222/json/version
+agent-browser --cdp $PORT --session "$SESSION" tab new "https://dev.bracos.app"   # bind a new tab
+# or pick an existing one by target id
+agent-browser --cdp $PORT --session "$SESSION" tab list --json
+agent-browser --cdp $PORT --session "$SESSION" tab <targetId>
 ```
 
-**If Chrome is running WITHOUT `--remote-debugging-port`:** ask the user to close and relaunch it — never close Chrome yourself. Explain they need to relaunch with the debug port flag.
-
-**Key:** `--user-data-dir` is REQUIRED. Without it Chrome refuses to enable remote debugging on a default profile.
-
-## Connect agent-browser
-
-**CRITICAL: Always use `--cdp 9222 --session <name>` on EVERY command.** The `--cdp` flag attaches to Chrome's debugging port, `--session` provides named session isolation for multi-tab work.
-
-**CRITICAL: Generate a unique 6-char alphanumeric session ID at the start of every agent run** — never use `main` or a hardcoded name. Two agents sharing a session name will overwrite each other's tab silently.
+## End a session
 
 ```bash
-# At the top of every agent — generate once, reuse throughout
-SESSION=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 6)
-
-agent-browser --cdp 9222 --session "$SESSION" snapshot -i
-agent-browser --cdp 9222 --session "$SESSION" click @e1
-agent-browser --cdp 9222 --session "$SESSION" screenshot /tmp/page.png
+agent-browser --cdp $PORT --session "$SESSION" tab close   # closes only your tab
+agent-browser --session "$SESSION" close                   # stops your daemon; Chrome stays up
 ```
 
-No separate `connect` step needed — `--cdp` handles the connection on each invocation.
+`close` on a CDP-attached session detaches; it does not quit Chrome
+(verified). Leaving tabs behind is not free: a cleanup job on 9223 closes
+stale `newtab` pages every 10 minutes and caps the tab count, so tidy up.
 
+## Parallel agents
 
-## Persistent login sessions
-
-Profile at `~/.chrome-beta-profile` persists cookies and sessions across restarts.
-
-**First time setup (e.g. LinkedIn):**
-1. Launch Chrome Beta (steps above)
-2. Connect agent-browser
-3. `agent-browser open "https://www.linkedin.com/login"`
-4. User logs in manually in the Chrome window
-5. Kill Chrome, relaunch - session is preserved
-
-**DO NOT** use Playwright profiles (`~/.agent-browser/profiles/`) - Chrome can't read them.
-
-## Parallel sessions (single Chrome instance)
-
-Multiple independent sessions share one Chrome instance and its login state. Each session gets its own tab.
-
-**Setup:**
+Every agent gets its own `SESSION` and its own pinned tab; all share the
+profile's cookies. Open all tabs first, then work, so the founder gets one
+burst of new tabs instead of a trickle.
 
 ```bash
-agent-browser --cdp 9222 --session s1 open "https://site1.com/apply"
-agent-browser --cdp 9222 --session s2 open "https://site2.com/apply"
-agent-browser --cdp 9222 --session s3 open "https://site3.com/apply"
-```
-
-**Each session operates independently:**
-
-```bash
-agent-browser --cdp 9222 --session s1 snapshot -i
-agent-browser --cdp 9222 --session s1 fill @e1 "Jane Doe"
-
-agent-browser --cdp 9222 --session s2 snapshot -i
-agent-browser --cdp 9222 --session s2 fill @e3 "user@example.com"
-```
-
-**Tested:** 5+ parallel sessions work, all sharing the same cookies/login state.
-
-**Cleanup:**
-
-```bash
-agent-browser --session s1 tab close
-agent-browser --session s2 tab close
-```
-
-## Batch tab opening (minimize focus interruptions)
-
-**CRITICAL: Opening a new Chrome tab steals OS focus from the user's current window. To avoid repeated interruptions, always batch-open all tabs upfront before doing any work.**
-
-### Option A: CDP background tabs (PREFERRED — zero focus steal)
-
-Use Chrome's CDP `Target.createTarget` endpoint directly. This creates tabs **without stealing OS focus** at all — Chrome stays in the background the entire time.
-
-```bash
-# Create background tabs via CDP HTTP API (no focus steal!)
-URLS=("https://site1.com/jobs" "https://site2.com/jobs" "https://site3.com/jobs")
-
-for url in "${URLS[@]}"; do
-  curl -s "http://localhost:9222/json/new?${url}" > /dev/null
+for ID in 124 180 182; do
+  agent-browser --cdp 9223 --session "job-$ID" --pin-tab open "https://example.com/apply/$ID"
 done
-
-# Wait for pages to load
-sleep 5
-
-# Now use sessions with --cdp to work with tabs
-agent-browser --cdp 9222 --session s0 snapshot -i
-agent-browser --cdp 9222 --session s1 snapshot -i
-agent-browser --cdp 9222 --session s2 snapshot -i
+# each agent then works only in its own session
+agent-browser --cdp 9223 --session job-124 snapshot -i
+agent-browser --cdp 9223 --session job-180 snapshot -i
 ```
 
-**How it works:** `GET http://localhost:9222/json/new?<url>` creates a new tab via CDP without triggering OS focus. The response includes the tab's `webSocketDebuggerUrl` for direct connection.
+Do not use `curl http://localhost:PORT/json/new?url` to pre-create tabs any
+more. A pinned session opens its own tab on first attach, and a tab created
+outside agent-browser has no session bound to it.
 
-### Option B: Batch agent-browser tabs (one brief focus steal)
+## Timeouts and recovery
 
-If CDP direct isn't available, batch-open all tabs in a tight loop — this causes ONE brief focus steal instead of N.
+`timeout` and `gtimeout` do not exist on this Mac. Use agent-browser's own
+timeout instead:
 
 ```bash
-URLS=("https://site1.com/jobs" "https://site2.com/jobs" "https://site3.com/jobs")
-
-for i in "${!URLS[@]}"; do
-  agent-browser --cdp 9222 --session "s$i" tab new "${URLS[$i]}"
-done
-
-sleep 5
-
-for i in "${!URLS[@]}"; do
-  agent-browser --cdp 9222 --session "s$i" snapshot
-done
+export AGENT_BROWSER_DEFAULT_TIMEOUT=15000   # ms, default 25000
 ```
 
-**NEVER open tabs one-by-one interleaved with work.** Bad: open tab, scrape, open tab, scrape. Good: open all tabs, then scrape all.
+If a command hangs or fails:
 
-## Job applications - parallel workflow
+1. `agent-browser --cdp $PORT --session "$SESSION" snapshot -i` to see where the page is.
+2. `agent-browser --cdp $PORT --session "$SESSION" session info --json` for daemon and binding state.
+3. `curl -s http://localhost:$PORT/json/version` to confirm Chrome is still answering.
+4. `agent-browser doctor` for stale install files. Never `doctor --fix` or `pkill` while other sessions are live (`agent-browser session list`).
 
-**CRITICAL: Every agent MUST use `--cdp 9222 --session job-{ID}` for ALL commands.**
+Break long flows into checkpoints (on form, info filled, file attached,
+submitted) and retry from the failed step, not from the start.
 
-**Before launching parallel agents, batch-open all tabs (prefer CDP for zero focus steal):**
+## Persistent logins
+
+Logins live in the Chrome profile directory, not in agent-browser. To add a
+login: open the site in a pinned session, tell the founder which window and
+tab, and let them log in by hand. The session persists across Chrome
+restarts. Do not use `--profile`, `--restore` or `--state` for these
+profiles; they are for agent-browser-launched browsers.
+
+## Launching a profile that is down
+
+Only 9222 is launched by hand. If its check fails, start it in the
+background and wait a few seconds:
 
 ```bash
-# Batch-open phase via CDP (PREFERRED — no focus steal)
-for ID in 124 180 182 195; do
-  curl -s "http://localhost:9222/json/new?https://company-$ID.com/apply" > /dev/null
-done
-sleep 5
+"/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta" \
+  --remote-debugging-port=9222 --user-data-dir="$HOME/.chrome-beta-profile-financas"
 ```
 
-**Then each agent works with `--cdp 9222 --session`:**
+`--user-data-dir` is required; Chrome refuses remote debugging on its
+default profile. If Chrome Beta is already running **without** the debug
+port, ask the founder to relaunch it. Do not close it yourself.
+
+9223 and 9225 are launchd services with KeepAlive. If one is down and the
+founder has asked you to bring it back:
 
 ```bash
-agent-browser --cdp 9222 --session job-124 snapshot
-agent-browser --cdp 9222 --session job-124 fill @ref_1 "Jane Doe"
-agent-browser --cdp 9222 --session job-124 tab close  # cleanup after done
+launchctl kickstart -k "gui/$(id -u)/app.bracos.chrome-beta-cdp"        # 9223
+launchctl kickstart -k "gui/$(id -u)/app.bracos.chrome-beta-cdp-acct2"  # 9225
 ```
 
-Multiple agents can run in parallel, each with its own `--session`:
+Read `docs/processes/prod-deploy-and-mac-mini-loops.md` in the bracos repo
+before touching launchd.
+
+## Upgrading agent-browser
+
+The daemon is a long-lived process; a new CLI talking to an old daemon fails
+silently. Upgrade only when `agent-browser session list` shows no live
+sessions you do not own, and never during the scraper's working hours
+without the founder's go-ahead.
 
 ```bash
-# Agent 1                                              # Agent 2
-agent-browser --cdp 9222 --session job-180 snapshot      agent-browser --cdp 9222 --session job-182 snapshot
-agent-browser --cdp 9222 --session job-180 fill @e1 val  agent-browser --cdp 9222 --session job-182 fill @e1 val
-```
-
-All sessions share the same cookies/login state (same Chrome profile). No interference between sessions.
-
-## Verify no automation flag
-
-```bash
-agent-browser eval 'navigator.webdriver'
-# Expected: false (or undefined)
-```
-
-## Reliability: timeouts and checkpoints
-
-The main failure mode in browser automation is an unbounded wait — a page that never loads, a element that never appears, a redirect loop. Don't iterate on browser config; instead, treat each browser subtask with a hard timeout and checkpoint strategy.
-
-**Hard timeouts on every command:**
-
-```bash
-timeout 15 agent-browser --cdp 9222 --session main snapshot -i
-timeout 10 agent-browser --cdp 9222 --session main click @e1
-timeout 20 agent-browser --cdp 9222 --session main fill @e3 "value"
-```
-
-If a command times out, take a snapshot to capture last-known state, then decide whether to retry or skip.
-
-**Checkpoint pattern for multi-step flows:**
-
-Break long flows (e.g. job applications) into discrete steps. After each step, snapshot and record progress so you can retry from that point rather than restarting from scratch.
-
-```
-Step 1: Navigate to form → checkpoint: on form page
-Step 2: Fill personal info → checkpoint: info filled
-Step 3: Upload CV        → checkpoint: CV attached
-Step 4: Submit           → checkpoint: done
-```
-
-If step 3 fails, retry from step 3 (the page is already on the form with info filled), not from step 1.
-
-**Recovery after timeout:**
-
-```bash
-# Take a snapshot to see where we are
-timeout 10 agent-browser --cdp 9222 --session main snapshot -i
-# If page is stuck, try navigating directly
-timeout 10 agent-browser --cdp 9222 --session main eval "window.location.href='https://...'"
-# If Chrome debugging port is unresponsive, verify it's still running
-curl -s http://localhost:9222/json/version
-```
-
-## Upgrading agent-browser: kill stale daemons
-
-**CRITICAL: After upgrading agent-browser, always kill stale daemons before using it.**
-
-agent-browser runs a background daemon process. When you upgrade versions, the old daemon keeps running. The new CLI talking to the old daemon causes silent failures: blank pages, missing cookies, wrong targets. There is no version mismatch warning.
-
-```bash
-pkill -f agent-browser
-rm -rf /tmp/agent-browser-* ~/.agent-browser/sockets/ 2>/dev/null
-bun install -g agent-browser@latest
+agent-browser upgrade          # or: bun install -g agent-browser@latest
+agent-browser doctor --fix     # clears stale sockets and state files
 agent-browser --version
 ```
 
-**Verified (2026-04-03):** v0.22.3 CDP connect works correctly — discovers existing pages, reads cookies. The old v0.10.0 pin was caused by stale Node.js daemons from pre-v0.16 versions, not a regression in newer code.
+## Verify it is a real browser
 
-**If CDP connect returns `about:blank` or empty cookies after upgrade:** stale daemon is the #1 suspect. Kill all processes and retry before debugging anything else.
-
-## Notes
-
-- If Chrome Beta is already running without `--remote-debugging-port`, kill it first
-- Profile at `~/.chrome-beta-profile` is separate from your main Chrome Beta profile
-- Chrome must be relaunched with the debug port each time (doesn't persist between reboots)
-- No need for multiple Chrome instances on different ports — use `--cdp 9222 --session <name>` instead
-- **Always use `--cdp 9222`** on every command to attach to Chrome's debugging port
-- **NEVER use `agent-browser --session <name> connect 9222`** — the `connect` subcommand creates blank tabs (bug in Rust daemon, verified v0.22.3)
+```bash
+agent-browser --cdp $PORT --session "$SESSION" eval 'navigator.webdriver'   # expect false or undefined
+```
