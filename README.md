@@ -7,6 +7,7 @@ Custom skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 1. Place this `skills/` directory under `~/.claude/skills/`
 2. Create `~/.claude/.env` with the required credentials (see below)
 3. Claude Code automatically loads env vars from `~/.claude/.env`
+ 4. Machine-specific, non-secret config that a skill needs (e.g. which Chrome profile listens on which CDP port for `real-browser`) goes in `~/.claude/<skill>.local.md`; see the skill's `LOCAL.example.md`
 
 ## Environment variables
 

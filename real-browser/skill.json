@@ -1,6 +1,6 @@
 {
   "name": "real-browser",
-  "description": "Attach agent-browser to the real Chrome Beta instances on this machine (one profile per CDP port, persistent logins, --pin-tab per session). Use for sites that detect automation, dev.bracos.app QA, or parallel agents sharing a browser.",
+  "description": "Attach agent-browser to a real, human-owned Chrome (persistent logins, one profile per CDP port, --pin-tab per session) instead of launching a Playwright-controlled browser. Use for sites that detect automation, QA against a logged-in app, or parallel agents sharing one browser.",
   "version": "2.0.0",
   "userInvocable": true
 }
