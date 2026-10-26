@@ -47,6 +47,7 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `job-search` | Scrape PM jobs, deduplicate, post to Google Sheet | `bun`, `sheets-cli` |
 | `linear` | Manage Linear issues and projects | `bun` |
 | `mail` | Manage Gmail | `gog` CLI |
+| `pidev` | Fan out DeepSeek v4.1 Flash subagents via the pi CLI (issues → worktrees → PRs) | `pi` CLI, OpenCode Go auth, `gh`, `jq` |
 | `pdf` | Fill and manipulate PDF forms | Python, `pypdf` |
 | `peon-ping-toggle` | Toggle peon-ping sound notifications | — |
 | `sheets-cli` | Read/write Google Sheets | `sheets-cli` CLI |
