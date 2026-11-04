@@ -9,21 +9,22 @@ Manage Hetzner Cloud infrastructure via REST API.
 
 ## Authentication
 
-Access via ni-gate:
+The token is `HCLOUD_TOKEN` in Infisical (`--env=prod`, path and project ID in `~/.claude/hetzner.local.md`, which also says which Hetzner account and project it sees). Load it at runtime with `infisical run`; never hardcode or echo it:
 
 ```bash
-ni-gate run HETZNER_API_KEY -- curl -s -H 'Authorization: Bearer $HETZNER_API_KEY' "https://api.hetzner.cloud/v1/servers"
+infisical run --silent --env=prod --path=<PATH> --projectId=<PROJECT_ID> -- \
+  sh -c 'curl -s -H "Authorization: Bearer $HCLOUD_TOKEN" https://api.hetzner.cloud/v1/servers'
 ```
 
-**ni-gate rules:** `HETZNER_API_KEY` permitted for `curl` commands to `https://api.hetzner.cloud/*`
+Single-quote the `sh -c` body so `$HCLOUD_TOKEN` expands inside the child process, not in your shell.
 
-**In context-mode environments**, use `ctx_execute` with shell language (direct `curl` via Bash is blocked by hooks).
+**Mutations** (`POST`/`PUT`/`DELETE`: creating servers, firewall `set_rules`, deleting anything) change real infrastructure and cost money. Get founder approval in the conversation first.
 
 ## API Base
 
 `https://api.hetzner.cloud/v1`
 
-All requests require header: `Authorization: Bearer $HETZNER_API_KEY`
+All requests require header: `Authorization: Bearer $HCLOUD_TOKEN`. The `-H '...'` in the examples below stands for that header, inside the `infisical run` wrapper above.
 
 ## Quick Reference — Common API Calls
 
