@@ -52,5 +52,5 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `peon-ping-toggle` | Toggle peon-ping sound notifications | — |
 | `sheets-cli` | Read/write Google Sheets | `sheets-cli` CLI |
 | `sync-transcripts` | Sync Hyprnote call transcripts to knowledge base | `bun` |
-| `telegram` | Post messages and article summaries to Telegram | `bun`, `grammy` |
+| `telegram` | Entry point for Telegram: Telethon, secrets in Infisical, Kira bot, channel posting | `infisical`, Telethon venv, `bun`, `grammy` |
 | `web-scraper` | Scrape dynamic pages | `bun`, `playwright` |
