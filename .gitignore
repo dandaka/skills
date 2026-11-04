@@ -11,3 +11,16 @@ node_modules/
 
 # Logs
 *.log
+
+# Installed and updated by their own tools, not maintained here
+# (treg installer: superdesigndev/treg; REA: morluto/rea)
+/treg/
+/web-access/
+/lead-signals/
+/make-ugc/
+/recruit/
+/reverse-engineer-anything/
+
+# Claude app skill sync, local scratch
+/synced/
+/dev-flow/
