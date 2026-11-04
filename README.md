@@ -54,3 +54,20 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `sync-transcripts` | Sync Hyprnote call transcripts to knowledge base | `bun` |
 | `telegram` | Entry point for Telegram: Telethon, secrets in Infisical, Kira bot, channel posting | `infisical`, Telethon venv, `bun`, `grammy` |
 | `web-scraper` | Scrape dynamic pages | `bun`, `playwright` |
+
+## Third-party skills (not in this repo)
+
+Installed into `~/.claude/skills/` by their own tools, which also keep them up to date.
+They are gitignored here; reinstall them on a new machine with the commands below.
+
+| Skill | Source | Install |
+|-------|--------|---------|
+| `treg` | [superdesigndev/treg · skills/treg](https://github.com/superdesigndev/treg/tree/main/skills/treg) | `curl -fsSL https://treg.to/install.sh \| sh` |
+| `web-access` | [superdesigndev/treg · skills/web-access](https://github.com/superdesigndev/treg/tree/main/skills/web-access) | `curl -fsSL https://treg.to/install.sh \| sh -s -- --skills web-access` |
+| `lead-signals` | [superdesigndev/treg · skills/lead-signals](https://github.com/superdesigndev/treg/tree/main/skills/lead-signals) | `curl -fsSL https://treg.to/install.sh \| sh -s -- --skills lead-signals` |
+| `make-ugc` | [superdesigndev/treg · skills/make-ugc](https://github.com/superdesigndev/treg/tree/main/skills/make-ugc) | `curl -fsSL https://treg.to/install.sh \| sh -s -- --skills make-ugc` |
+| `recruit` | [superdesigndev/treg · skills/recruit](https://github.com/superdesigndev/treg/tree/main/skills/recruit) | `curl -fsSL https://treg.to/install.sh \| sh -s -- --skills recruit` |
+| `reverse-engineer-anything` | [morluto/rea · .agents/skills/reverse-engineer-anything](https://github.com/morluto/rea/tree/main/.agents/skills/reverse-engineer-anything) | `npx rea-agents@latest setup` (also registers the REA MCP server) |
+
+All treg workflow skills at once: `curl -fsSL https://treg.to/install.sh | sh -s -- --skills all`.
+In Claude Code each is also a plugin: `/plugin marketplace add superdesigndev/treg`, then `/plugin install <skill>@treg`.
