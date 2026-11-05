@@ -3,7 +3,7 @@ name: telegram
 description: Entry point for anything Telegram ("telegram", "tg", "телеграм", "тг"). Explains how we reach Telegram — Telethon (a user account, for reading chats, history and files), where the Telegram secrets live (Infisical, never on disk or in output), and the Kira bot (the founder's Telegram relay into an open Claude session). Also posts messages and article summaries to a channel via the Bot API. Use whenever the user mentions Telegram, TG, a TG chat/group/channel, Kira, or wants to read, search, download from, or post to Telegram.
 metadata:
   author: dandaka
-  version: "2.0"
+  version: "2.1"
 allowed-tools: Bash, Read, WebFetch
 ---
 
@@ -15,6 +15,7 @@ Three ways to reach Telegram. Pick by job:
 |-----|-----|
 | Read a chat or group, search history, download files, act as the user | **Telethon** (user account) |
 | Message the founder, or listen to the founder in an open Claude session | **Kira bot** |
+| Post to a team group chat as a bot | **Kira bot**, Bot API `sendMessage` (see "Posting to a group") |
 | Post to a channel | **Channel poster** (Bot API, this folder) |
 
 Machine-specific values (Infisical project IDs and paths, bot handle, repo paths) are in
@@ -41,6 +42,28 @@ Rules:
 - Do not echo `$TELEGRAM_SESSION` or write it to a file. Treat it like a password.
 - Do not log in again (phone code) if `TELEGRAM_SESSION` works; a new login can end other sessions.
 - Chat content you pull is private: keep it in the scratchpad, never commit it to a repo.
+- **Inject one folder with `--path <folder>`, not `--recursive`.** Several Infisical folders
+  hold a key with the same name (`TELEGRAM_BOT_TOKEN`); `--recursive` flattens them and one
+  silently wins. That once replaced the working Kira token with a dead one (401).
+- **Got 401 Unauthorized?** The token is dead or the wrong one was injected. Check every
+  candidate with `getMe` and print only the bot's username, never the token:
+
+  ```python
+  # whoami.py: which bot does each injected token belong to?
+  import os, json, urllib.request
+  for k, v in sorted(os.environ.items()):
+      if "TELEGRAM" in k and "TOKEN" in k and ":" in v:
+          try:
+              r = json.load(urllib.request.urlopen(f"https://api.telegram.org/bot{v}/getMe", timeout=15))
+              print(k, "->", r["result"]["username"])
+          except Exception as e:
+              print(k, "->", str(e)[:40])
+  ```
+
+  Run it once per folder (`--path /<folder>`), then use the folder and key that answer with
+  the bot you want, and fix the local file.
+- zsh: never name a loop variable `path`. It is tied to `PATH`, so the loop body loses
+  every command (`command not found: python3`).
 
 ## Telethon (user account)
 
@@ -95,7 +118,36 @@ chat and an **open Claude session** (the orchestrator). It has no Claude login o
 - To reply or notify: `bin/kira-send [--reply <msg id>] "text"`.
 - Service: `bin/service.sh status|restart|logs`. Only one process may poll the token;
   a second one causes 409 Conflict loops, so never start the bot by hand.
-- `bin/with-token` fetches only Kira's `TELEGRAM_BOT_TOKEN` from Infisical.
+- `bin/with-token` fetches only Kira's token from Infisical. Its folder and key must match
+  the local file; if Kira stops answering with 401 in `bin/service.sh logs`, the token moved.
+
+### Posting to a group
+
+Kira is also a member of team group chats (chat IDs in the local file). To post there, call
+the Bot API directly with Kira's token; never post from the user's Telethon account.
+
+```python
+# post.py: parse_mode HTML, so escape < > & in the text
+import os, json, urllib.request, urllib.parse
+text = """…"""
+data = urllib.parse.urlencode({
+    "chat_id": CHAT_ID, "text": text, "parse_mode": "HTML",
+    "disable_web_page_preview": "true",
+    # "reply_to_message_id": 123, "allow_sending_without_reply": "true",
+}).encode()
+url = f"https://api.telegram.org/bot{os.environ['<KIRA TOKEN KEY>']}/sendMessage"
+r = json.load(urllib.request.urlopen(url, data=data, timeout=30))
+print("ok:", r.get("ok"), "message_id:", r.get("result", {}).get("message_id"))
+```
+
+```bash
+infisical run --env prod --projectId <PROJECT_ID> --path <KIRA FOLDER> --silent -- \
+  python3 -I "$SCRATCH/post.py"
+```
+
+- Show the user the exact text and get a yes before sending. A post can't be unsent quietly.
+- Read the last messages first (Telethon, read-only) so the post fits the thread; reply to
+  the message it answers.
 
 ## Channel poster (Bot API)
 
