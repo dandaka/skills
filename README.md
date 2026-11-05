@@ -14,7 +14,7 @@ Custom skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 ```bash
 # ~/.claude/.env
 
-# Google (for calendar, doc, mail, sheets skills)
+# Google (for calendar, doc, mail skills)
 GOOGLE_ACCOUNT=you@gmail.com
 
 # Telegram (for telegram skill)
@@ -51,7 +51,6 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `pidev` | Fan out DeepSeek v4.1 Flash subagents via the pi CLI (issues → worktrees → PRs) | `pi` CLI, OpenCode Go auth, `gh`, `jq` |
 | `pdf` | Fill and manipulate PDF forms | Python, `pypdf` |
 | `peon-ping-toggle` | Toggle peon-ping sound notifications | — |
-| `sheets-cli` | Read/write Google Sheets | `sheets-cli` CLI |
 | `sync-transcripts` | Sync Hyprnote call transcripts to knowledge base | `bun` |
 | `telegram` | Entry point for Telegram: Telethon, secrets in Infisical, Kira bot, channel posting | `infisical`, Telethon venv, `bun`, `grammy` |
 | `web-scraper` | Scrape dynamic pages | `bun`, `playwright` |
