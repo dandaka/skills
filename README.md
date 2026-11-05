@@ -14,7 +14,7 @@ Custom skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 ```bash
 # ~/.claude/.env
 
-# Google (for calendar, mail, sheets skills)
+# Google (for calendar, doc, mail, sheets skills)
 GOOGLE_ACCOUNT=you@gmail.com
 
 # Telegram (for telegram skill)
@@ -41,6 +41,7 @@ GDRIVE_BLOG_FOLDER_ID=...
 | `blog-sync-video-src` | Sync blog videos to Google Drive | `rclone` |
 | `calendar` | Manage Google Calendar | `gog` CLI |
 | `cv-generator` | Generate PDF CVs from markdown | `md-to-pdf`, Libertinus Serif font |
+| `doc` | Create Google Docs / Sheets with gog to share with external parties | `gog` CLI |
 | `discord-post` | Generate Discord announcements | — |
 | `frontend-standards` | Evidence-based Figma↔browser frontend protocol: preflight, intent intake, measure→experiment→commit debugging, design vocabulary | `figma-use`, `agent-browser` (CDP) |
 | `interview` | Structured interview for implementation plans | — |
