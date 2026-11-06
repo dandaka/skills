@@ -5,11 +5,15 @@
  *
  * Usage: DEEPGRAM_API_KEY=... bun transcribe-deepgram.ts <session_folder>
  *
+ * Auto-detects the audio file in the folder:
+ *   - Hyprnote: audio.mp3 / audio.wav / audio.m4a
+ *   - Zoom: audio_only*.m4a, audio*.m4a, video*.mp4 (audio extracted by Deepgram)
+ *
  * Produces transcript.json with structure:
  * { transcripts: [{ words: [{ channel, start_ms, end_ms, text }] }] }
  */
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 
 const sessionFolder = process.argv[2];
@@ -18,9 +22,44 @@ if (!sessionFolder) {
   process.exit(1);
 }
 
-const audioPath = join(sessionFolder, "audio.mp3");
-if (!existsSync(audioPath)) {
-  console.error(`No audio.mp3 found in ${sessionFolder}`);
+function findAudioFile(folder: string): string | null {
+  const files = readdirSync(folder);
+  // Exact names first (Hyprnote convention)
+  for (const name of ["audio.mp3", "audio.wav", "audio.m4a"]) {
+    const p = join(folder, name);
+    if (existsSync(p)) return p;
+  }
+  // Zoom-style prefixed files, ranked: audio_only > audio > video
+  const pick = (re: RegExp): string | null => {
+    const match = files.filter((f: string) => re.test(f)).sort()[0];
+    return match ? join(folder, match) : null;
+  };
+  return (
+    pick(/^audio_only.*\.(m4a|mp3|wav)$/i) ??
+    pick(/^audio.*\.(m4a|mp3|wav|mp4)$/i) ??
+    pick(/^video.*\.(mp4|mov|m4v)$/i)
+  );
+}
+
+function contentTypeFor(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    wav: "audio/wav",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    mov: "video/quicktime",
+    aac: "audio/aac",
+    ogg: "audio/ogg",
+    webm: "audio/webm",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
+
+const audioPath = findAudioFile(sessionFolder) ?? "";
+if (!audioPath) {
+  console.error(`No audio file (mp3/wav/m4a/mp4) found in ${sessionFolder}`);
   process.exit(1);
 }
 
@@ -56,7 +95,7 @@ const response = await fetch(
     method: "POST",
     headers: {
       Authorization: `Token ${apiKey}`,
-      "Content-Type": "audio/mpeg",
+      "Content-Type": contentTypeFor(audioPath),
     },
     body: audioBuffer,
   }

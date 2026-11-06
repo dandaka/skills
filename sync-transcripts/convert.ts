@@ -67,7 +67,9 @@ function buildTurns(words: Word[]): Array<{ channel: number; text: string }> {
 }
 
 function speakerLabel(channel: number): string {
-  return channel === 0 ? "Me" : "Other";
+  if (channel === 0) return "Me";
+  if (channel === 1) return "Other";
+  return `Speaker ${channel}`;
 }
 
 const [, , sessionFolder, outputPath] = process.argv;
@@ -109,13 +111,19 @@ if (allWords.length < 10) {
   process.exit(2);
 }
 
-const turns = buildTurns(allWords);
+// Diarized transcripts (hyprnote / Deepgram) carry channel 0/1/... per speaker.
+// Local (parakeet) transcripts are single-channel: keep sentence-level turns
+// and label them neutrally instead of claiming "Me".
+const diarized = new Set(allWords.map((w) => w.channel)).size > 1;
+const turns = diarized
+  ? buildTurns(allWords)
+  : allWords.map((w) => ({ channel: w.channel, text: w.text.trim() }));
 const date = meta.created_at.substring(0, 10);
 const participants =
   meta.participants?.length > 0 ? meta.participants.join(", ") : "Unknown";
 
 const transcriptLines = turns
-  .map((t) => `**${speakerLabel(t.channel)}:** ${t.text}`)
+  .map((t) => `**${diarized ? speakerLabel(t.channel) : "Speaker"}:** ${t.text}`)
   .join("\n\n");
 
 const markdown = `# ${meta.title}
