@@ -145,7 +145,8 @@ infisical run --env prod --projectId <PROJECT_ID> --path <KIRA FOLDER> --silent 
   python3 -I "$SCRATCH/post.py"
 ```
 
-- Show the user the exact text and get a yes before sending. A post can't be unsent quietly.
+- When the user asks to post, send right away: no draft, no waiting for a yes. Afterwards show
+  the user the exact text that went out. Never post unless the user asked.
 - Read the last messages first (Telethon, read-only) so the post fits the thread; reply to
   the message it answers.
 
