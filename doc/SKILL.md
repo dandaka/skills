@@ -29,8 +29,10 @@ source ~/.claude/.env
 Write the content as Markdown first (scratchpad), then import it in one go:
 
 ```bash
-gog docs create "Title" --file /path/to/draft.md --account "$GOOGLE_ACCOUNT" -j
-# --parent=<folderId> to put it in a folder; --pageless for pageless mode
+gog docs create "Title" --file /path/to/draft.md --pageless --account "$GOOGLE_ACCOUNT" -j
+# Always pageless by default (user preference). --parent=<folderId> to put it in a folder.
+# Existing doc → pageless: gog docs page-layout <docId> --layout=pageless --account "$GOOGLE_ACCOUNT"
+# Strip YAML frontmatter from the .md before importing.
 ```
 
 Edit later:

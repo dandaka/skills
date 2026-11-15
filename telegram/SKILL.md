@@ -117,6 +117,10 @@ infisical run --env prod --projectId <PROJECT_ID> --silent -- \
 
 ## Kira bot
 
+**Kira is female (Kira Nova).** Anything posted as Kira speaks in her voice: in Russian and
+other gendered languages use feminine forms ("собрала", "сделала", "посмотрела", not
+"собрал"). Proofread verb endings before sending.
+
 Kira is the founder's personal Telegram bot. It is only a relay between the founder's private
 chat and an **open Claude session** (the orchestrator). It has no Claude login of its own.
 
