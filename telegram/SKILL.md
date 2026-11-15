@@ -21,6 +21,16 @@ Three ways to reach Telegram. Pick by job:
 Machine-specific values (Infisical project IDs and paths, bot handle, repo paths) are in
 `~/.claude/telegram.local.md`. Read it first. It is private and not in this repo.
 
+### New machine setup (local file or venv missing)
+
+1. **Local file.** Copy it from a machine that has it (the always-on dev machine listed in
+   `~/.claude/machines.md`, over Tailscale): `ssh <host> 'cat ~/.claude/telegram.local.md'`, write it to
+   `~/.claude/telegram.local.md`, and fix the machine-specific bits (repo paths, what runs
+   where). Do not search every Infisical project for the session: it is not where you'd guess.
+2. **Venv.** `cd ~/.claude/skills/telegram-telethon && uv venv -q .venv && uv pip install -q --python .venv/bin/python -e .`
+3. **Check.** Run a script that prints `await c.is_user_authorized()` (expect `True`) through
+   `infisical run`. Note the verified date in the local file.
+
 ## Secrets
 
 All Telegram secrets live in **Infisical** (`prod` env). Never put them in `.env`, files,
