@@ -2,12 +2,18 @@
 /**
  * OpenOats → Knowledge Base sync tool.
  *
- * Scans ~/Library/Application Support/OpenOats/sessions for recorded sessions
- * and converts them to markdown in <calls_dir>/openoats/.
+ * Scans ~/Library/Application Support/OpenOats/sessions (old layout) and
+ * .../OpenOats/Meetings (layout since ~2026-11-21) for recorded calls and
+ * converts them to markdown in <calls_dir>/openoats/.
  *
  * OpenOats transcribes locally (parakeetV3) as the call happens, so unlike the
  * Zoom path there is nothing to transcribe here — transcript.live.jsonl is
  * already present and carries per-utterance speaker labels.
+ *
+ * Newer OpenOats versions also keep raw audio (audio/mic.caf + sys.caf) and,
+ * after the call, run a batch re-transcription that writes
+ * transcript.final.jsonl (same schema, noticeably more accurate). That file
+ * is preferred when present; the batch pass can fail, so live is the fallback.
  *
  * Usage:
  *   bun openoats.ts <calls_dir>                    # show new recordings
@@ -28,9 +34,18 @@ if (!CALLS_DIR) {
 
 const INDEX_PATH = join(CALLS_DIR, "openoats-index.json");
 const OO_DIR = `${process.env.HOME}/Library/Application Support/OpenOats/sessions`;
+/**
+ * Since ~2026-11-21 OpenOats (the build from ~/projects/OpenOats) writes each
+ * call to Meetings/<YYYY-MM-DD-HHMMSS-xxxx>/ instead: meeting.json (state,
+ * startedAt, duration, optional title), transcript.json (a JSON array of
+ * {speaker: "You"|"Them", start, text}, already merged across mic + system
+ * channels), plus mic/system .m4a and per-channel .json.
+ */
+const OO_MEETINGS_DIR = `${process.env.HOME}/Library/Application Support/OpenOats/Meetings`;
 const OO_OUT_DIR = join(CALLS_DIR, "openoats");
 
 const SESSION_RE = /^session_(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})$/;
+const MEETING_RE = /^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-[0-9a-f]+$/;
 
 /** Sessions with fewer utterances than this carry no real content. */
 const MIN_UTTERANCES = 10;
@@ -89,7 +104,12 @@ function saveIndex(index: Index): void {
 }
 
 function readUtterances(dir: string): Utterance[] {
-  const path = join(dir, "transcript.live.jsonl");
+  const final = readJsonl(join(dir, "transcript.final.jsonl"));
+  if (final.some((u) => (u.text ?? "").trim())) return final;
+  return readJsonl(join(dir, "transcript.live.jsonl"));
+}
+
+function readJsonl(path: string): Utterance[] {
   if (!existsSync(path)) return [];
   const out: Utterance[] = [];
   for (const line of readFileSync(path, "utf-8").split("\n")) {
@@ -110,7 +130,7 @@ function readUtterances(dir: string): Utterance[] {
  * topic — the caller can rename later.
  */
 function deriveTitle(meta: SessionMeta, date: string, time: string): { title: string; untitled: boolean } {
-  const t = meta.title?.trim();
+  const t = cleanTitle(meta.title);
   if (t && !GENERIC_TITLES.has(t.toLowerCase())) return { title: t, untitled: false };
   // Keep the app name in the placeholder ("Zoom 2026-11-06 19:14") so the
   // pre-rename filename still hints at where the call happened.
@@ -123,6 +143,15 @@ function deriveTitle(meta: SessionMeta, date: string, time: string): { title: st
  * about the topic, so treat it as untitled and flag the file for renaming.
  */
 const GENERIC_TITLES = new Set(["zoom", "google meet", "meet", "microsoft teams", "teams", "facetime", "slack", "telegram", "whatsapp", "discord"]);
+
+/**
+ * OpenOats copies the app's display name verbatim, and some carry invisible
+ * bidi/format marks (WhatsApp is "‎WhatsApp"). Strip them so the
+ * generic-title check and the H1 see the plain name.
+ */
+function cleanTitle(title: string | undefined): string {
+  return (title ?? "").replace(/[​-‏‪-‮⁠-⁤﻿]/g, "").trim();
+}
 
 function discover(): Recording[] {
   if (!existsSync(OO_DIR)) return [];
@@ -157,12 +186,46 @@ function discover(): Recording[] {
     });
   }
 
+  recordings.push(...discoverMeetings());
   return recordings.sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
+/** The Meetings/ layout (see OO_MEETINGS_DIR). Meetings still in progress are skipped. */
+function discoverMeetings(): Recording[] {
+  if (!existsSync(OO_MEETINGS_DIR)) return [];
+  const out: Recording[] = [];
+  for (const entry of readdirSync(OO_MEETINGS_DIR)) {
+    const m = entry.match(MEETING_RE);
+    if (!m) continue;
+    const dir = join(OO_MEETINGS_DIR, entry);
+    const [, date, hh, mm, ss] = m;
+
+    let meta: SessionMeta & { state?: string } = {};
+    try {
+      meta = JSON.parse(readFileSync(join(dir, "meeting.json"), "utf-8"));
+    } catch {
+      continue;
+    }
+    if (meta.state && meta.state !== "done") continue;
+
+    let utterances: Utterance[] = [];
+    try {
+      const raw = JSON.parse(readFileSync(join(dir, "transcript.json"), "utf-8"));
+      if (Array.isArray(raw)) utterances = raw;
+    } catch {
+      // No transcript yet: treated as empty and skipped below.
+    }
+    utterances = utterances.filter((u) => (u.text ?? "").trim());
+    const { title, untitled } = deriveTitle(meta, date, `${hh}:${mm}`);
+    out.push({ id: entry, title, created_at: `${date}T${hh}:${mm}:${ss}`, utterances, untitled });
+  }
+  return out;
+}
+
 function speakerLabel(speaker: string | undefined): string {
-  if (speaker === "you") return "Me";
-  if (speaker === "them") return "Other";
+  const s = (speaker ?? "").toLowerCase();
+  if (s === "you") return "Me";
+  if (s === "them") return "Other";
   return "Speaker";
 }
 
@@ -309,7 +372,7 @@ if (doUntitled) {
   // Synced files still waiting for a descriptive title.
   const waiting = Object.values(index).filter(
     (e) => e.synced && !e.renamed && existsSync(join(OO_OUT_DIR, e.filename)) &&
-      (GENERIC_TITLES.has(e.title.trim().toLowerCase()) ||
+      (GENERIC_TITLES.has(cleanTitle(e.title).toLowerCase()) ||
         readFileSync(join(OO_OUT_DIR, e.filename), "utf-8").includes("Untitled in OpenOats"))
   );
   if (!waiting.length) console.log("No untitled OpenOats calls.");
